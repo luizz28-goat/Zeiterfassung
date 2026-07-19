@@ -461,6 +461,21 @@
   </details>
 
   <details class="cat-manage">
+    <summary>Cloud-Synchronisierung (gemeinsame Tabelle)</summary>
+    <div class="manual-form" style="margin-top:14px;">
+      <label>Dein Name
+        <input type="text" id="sync-name" placeholder="z. B. Max">
+      </label>
+      <label style="flex:1; min-width:220px;">Google-Sheet-Link (Apps-Script-URL)
+        <input type="text" id="sync-url" placeholder="https://script.google.com/macros/s/.../exec">
+      </label>
+      <button id="sync-save">Speichern</button>
+    </div>
+    <div class="note" id="sync-status"></div>
+    <div class="note">Jeder Stop wird automatisch an diese Adresse gesendet und landet als neue Zeile in eurer gemeinsamen Google-Tabelle. Lokal bleibt trotzdem alles zusätzlich gespeichert.</div>
+  </details>
+
+  <details class="cat-manage">
     <summary>Kategorien verwalten</summary>
     <div class="cat-manage-list" id="cat-manage-list"></div>
     <div class="add-cat-form">
@@ -482,12 +497,12 @@
 const CATS_KEY = 'categories';
 const STORAGE_KEY = 'work-sessions';
 const ACTIVE_KEY = 'active-session';
+const SYNC_NAME_KEY = 'sync-person-name';
+const SYNC_URL_KEY = 'sync-sheet-url';
 
 const PALETTE = ['#A83A2E', '#3B6E8F', '#5B7B3F', '#8B5FA0', '#B8862E', '#4F4F4F'];
 const DEFAULT_CATS = [
-  { id: 'arbeit', name: 'Arbeit', color: '#A83A2E' },
-  { id: 'schule', name: 'Schule', color: '#3B6E8F' },
-  { id: 'zocken', name: 'Zocken', color: '#5B7B3F' }
+  { id: 'arbeit', name: 'Arbeit', color: '#A83A2E' }
 ];
 
 let categories = [];
@@ -540,6 +555,9 @@ async function load() {
     active = v ? JSON.parse(v) : null;
   } catch (e) { active = null; }
   selectedCat = (active && active.categoryId) || categories[0]?.id || null;
+
+  document.getElementById('sync-name').value = localStorage.getItem(SYNC_NAME_KEY) || '';
+  document.getElementById('sync-url').value = localStorage.getItem(SYNC_URL_KEY) || '';
 }
 
 async function saveCats() { try { localStorage.setItem(CATS_KEY, JSON.stringify(categories)); } catch (e) {} }
@@ -550,6 +568,39 @@ async function saveActive() {
     else localStorage.removeItem(ACTIVE_KEY);
   } catch (e) {}
 }
+
+function sendToSheet(session) {
+  const url = localStorage.getItem(SYNC_URL_KEY);
+  if (!url) return;
+  const name = localStorage.getItem(SYNC_NAME_KEY) || 'Unbekannt';
+  const sd = new Date(session.start);
+  const ed = new Date(session.end);
+  const cat = catById(session.categoryId);
+  const payload = {
+    person: name,
+    kategorie: cat ? cat.name : 'Gelöscht',
+    datum: sd.toLocaleDateString('de-DE'),
+    start: fmtTime(sd),
+    ende: fmtTime(ed),
+    dauerStunden: Math.round((session.duration / 3600000) * 100) / 100,
+    dauerHHMM: fmtDur(session.duration)
+  };
+  fetch(url, {
+    method: 'POST',
+    mode: 'no-cors',
+    headers: { 'Content-Type': 'text/plain' },
+    body: JSON.stringify(payload)
+  }).catch(() => {});
+}
+
+document.getElementById('sync-save').addEventListener('click', () => {
+  const name = document.getElementById('sync-name').value.trim();
+  const url = document.getElementById('sync-url').value.trim();
+  localStorage.setItem(SYNC_NAME_KEY, name);
+  localStorage.setItem(SYNC_URL_KEY, url);
+  const status = document.getElementById('sync-status');
+  status.textContent = url ? 'Gespeichert. Neue Stopps werden jetzt an die Tabelle gesendet.' : 'Gespeichert. Kein Link hinterlegt, Sync ist aus.';
+});
 
 function renderCats() {
   const wrap = document.getElementById('cats');
@@ -731,10 +782,12 @@ function tick() {
 async function stopActive() {
   if (!active) return;
   const end = Date.now();
-  sessions.push({ id: active.start, categoryId: active.categoryId, start: active.start, end: end, duration: end - active.start });
+  const session = { id: active.start, categoryId: active.categoryId, start: active.start, end: end, duration: end - active.start };
+  sessions.push(session);
   active = null;
   await saveSessions();
   await saveActive();
+  sendToSheet(session);
   if (tickHandle) clearInterval(tickHandle);
   document.getElementById('clock-display').textContent = '00:00:00';
 }
@@ -766,8 +819,10 @@ document.getElementById('m-add').addEventListener('click', async () => {
   const start = new Date(dateVal + 'T' + startVal + ':00');
   const end = new Date(dateVal + 'T' + endVal + ':00');
   if (end <= start) { alert('Ende muss nach dem Start liegen.'); return; }
-  sessions.push({ id: start.getTime(), categoryId: catId, start: start.getTime(), end: end.getTime(), duration: end.getTime() - start.getTime() });
+  const session = { id: start.getTime(), categoryId: catId, start: start.getTime(), end: end.getTime(), duration: end.getTime() - start.getTime() };
+  sessions.push(session);
   await saveSessions();
+  sendToSheet(session);
   document.getElementById('m-date').value = '';
   document.getElementById('m-start').value = '';
   document.getElementById('m-end').value = '';
@@ -787,35 +842,56 @@ document.getElementById('new-cat-add').addEventListener('click', async () => {
   render();
 });
 
+const MONTH_NAMES = ['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
+
 document.getElementById('export-btn').addEventListener('click', () => {
   if (sessions.length === 0) { alert('Noch keine Einträge zum Exportieren.'); return; }
-  const sorted = [...sessions].sort((a, b) => a.start - b.start);
-  const rows = sorted.map(s => {
+
+  const byMonth = {};
+  sessions.forEach(s => {
     const sd = new Date(s.start);
-    const ed = new Date(s.end);
-    const hours = Math.round((s.duration / 3600000) * 100) / 100;
-    const cat = catById(s.categoryId);
-    return {
-      'Kategorie': cat ? cat.name : 'Gelöscht',
-      'Datum': sd.toLocaleDateString('de-DE'),
-      'Start': fmtTime(sd),
-      'Ende': fmtTime(ed),
-      'Dauer (Std.)': hours,
-      'Dauer (hh:mm)': fmtDur(s.duration)
-    };
-  });
-  const byCat = {};
-  sessions.forEach(s => { byCat[s.categoryId] = (byCat[s.categoryId] || 0) + s.duration; });
-  rows.push({ 'Kategorie': '', 'Datum': '', 'Start': '', 'Ende': '', 'Dauer (Std.)': '', 'Dauer (hh:mm)': '' });
-  Object.keys(byCat).forEach(cid => {
-    const cat = catById(cid);
-    rows.push({ 'Kategorie': (cat ? cat.name : 'Gelöscht') + ' – Summe', 'Datum': '', 'Start': '', 'Ende': '', 'Dauer (Std.)': Math.round((byCat[cid] / 3600000) * 100) / 100, 'Dauer (hh:mm)': fmtDur(byCat[cid]) });
+    const key = sd.getFullYear() + '-' + String(sd.getMonth() + 1).padStart(2, '0');
+    if (!byMonth[key]) byMonth[key] = [];
+    byMonth[key].push(s);
   });
 
-  const ws = XLSX.utils.json_to_sheet(rows);
-  ws['!cols'] = [{ wch: 14 }, { wch: 12 }, { wch: 8 }, { wch: 8 }, { wch: 12 }, { wch: 12 }];
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'Zeitkonto');
+  const monthKeys = Object.keys(byMonth).sort();
+
+  monthKeys.forEach(key => {
+    const entries = [...byMonth[key]].sort((a, b) => a.start - b.start);
+    const rows = entries.map(s => {
+      const sd = new Date(s.start);
+      const ed = new Date(s.end);
+      const hours = Math.round((s.duration / 3600000) * 100) / 100;
+      const cat = catById(s.categoryId);
+      return {
+        'Kategorie': cat ? cat.name : 'Gelöscht',
+        'Datum': sd.toLocaleDateString('de-DE'),
+        'Start': fmtTime(sd),
+        'Ende': fmtTime(ed),
+        'Dauer (Std.)': hours,
+        'Dauer (hh:mm)': fmtDur(s.duration)
+      };
+    });
+
+    const byCat = {};
+    entries.forEach(s => { byCat[s.categoryId] = (byCat[s.categoryId] || 0) + s.duration; });
+    rows.push({ 'Kategorie': '', 'Datum': '', 'Start': '', 'Ende': '', 'Dauer (Std.)': '', 'Dauer (hh:mm)': '' });
+    Object.keys(byCat).forEach(cid => {
+      const cat = catById(cid);
+      rows.push({ 'Kategorie': (cat ? cat.name : 'Gelöscht') + ' – Summe', 'Datum': '', 'Start': '', 'Ende': '', 'Dauer (Std.)': Math.round((byCat[cid] / 3600000) * 100) / 100, 'Dauer (hh:mm)': fmtDur(byCat[cid]) });
+    });
+    const monthTotal = entries.reduce((sum, s) => sum + s.duration, 0);
+    rows.push({ 'Kategorie': 'Gesamt Monat', 'Datum': '', 'Start': '', 'Ende': '', 'Dauer (Std.)': Math.round((monthTotal / 3600000) * 100) / 100, 'Dauer (hh:mm)': fmtDur(monthTotal) });
+
+    const [year, month] = key.split('-');
+    const sheetName = (MONTH_NAMES[parseInt(month, 10) - 1] + ' ' + year).slice(0, 31);
+    const ws = XLSX.utils.json_to_sheet(rows);
+    ws['!cols'] = [{ wch: 14 }, { wch: 12 }, { wch: 8 }, { wch: 8 }, { wch: 12 }, { wch: 12 }];
+    XLSX.utils.book_append_sheet(wb, ws, sheetName);
+  });
+
   const filename = 'Zeitkonto_' + new Date().toISOString().slice(0, 10) + '.xlsx';
   XLSX.writeFile(wb, filename);
 });
