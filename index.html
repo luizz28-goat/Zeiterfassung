@@ -482,6 +482,30 @@
   </details>
 
   <details class="cat-manage">
+    <summary>Standort-Automatik</summary>
+    <div class="note">Startet und stoppt die Zeitzählung automatisch, wenn du einen gespeicherten Ort betrittst bzw. verlässt – <strong>solange diese Seite geöffnet ist</strong>. Schließt du die App, pausiert die Erkennung.</div>
+    <div style="margin:12px 0;">
+      <button class="export-btn" id="auto-toggle">Automatik einschalten</button>
+      <div class="note" id="auto-status" style="margin-top:8px;"></div>
+    </div>
+    <div class="cat-manage-list" id="place-list"></div>
+    <div class="add-cat-form" style="margin-top:14px;">
+      <input type="text" id="place-name" placeholder="Name, z. B. Büro">
+      <select id="place-cat"></select>
+      <input type="number" id="place-radius" placeholder="Radius (m)" value="100" style="width:110px;">
+    </div>
+    <div class="add-cat-form">
+      <input type="text" id="place-lat" placeholder="Breitengrad (Lat)" style="flex:1;">
+      <input type="text" id="place-lng" placeholder="Längengrad (Lng)" style="flex:1;">
+      <button id="place-use-location" class="export-btn">Aktuellen Standort verwenden</button>
+    </div>
+    <div class="add-cat-form">
+      <button id="place-add" class="export-btn">Ort speichern</button>
+    </div>
+    <div class="note">Tipp: Stelle dich an den gewünschten Ort und tippe auf „Aktuellen Standort verwenden", statt Koordinaten selbst zu suchen.</div>
+  </details>
+
+  <details class="cat-manage">
     <summary>Kategorien verwalten</summary>
     <div class="cat-manage-list" id="cat-manage-list"></div>
     <div class="add-cat-form">
@@ -505,6 +529,8 @@ const STORAGE_KEY = 'work-sessions';
 const ACTIVE_KEY = 'active-session';
 const SYNC_NAME_KEY = 'sync-person-name';
 const SYNC_URL_KEY = 'sync-sheet-url';
+const PLACES_KEY = 'places';
+const AUTO_KEY = 'auto-tracking-enabled';
 
 const PALETTE = ['#A83A2E', '#3B6E8F', '#5B7B3F', '#8B5FA0', '#B8862E', '#4F4F4F'];
 const DEFAULT_CATS = [
@@ -517,6 +543,9 @@ let active = null;
 let selectedCat = null;
 let currentRange = 'today';
 let tickHandle = null;
+let places = [];
+let watchId = null;
+let insideMap = {};
 
 function fmtDate(d) {
   return d.toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' });
@@ -565,9 +594,16 @@ async function load() {
   } catch (e) { active = null; }
   selectedCat = (active && active.categoryId) || categories[0]?.id || null;
 
+  try {
+    const v = localStorage.getItem(PLACES_KEY);
+    places = v ? JSON.parse(v) : [];
+  } catch (e) { places = []; }
+
   document.getElementById('sync-name').value = localStorage.getItem(SYNC_NAME_KEY) || '';
   document.getElementById('sync-url').value = localStorage.getItem(SYNC_URL_KEY) || '';
 }
+
+async function savePlaces() { try { localStorage.setItem(PLACES_KEY, JSON.stringify(places)); } catch (e) {} }
 
 async function saveCats() { try { localStorage.setItem(CATS_KEY, JSON.stringify(categories)); } catch (e) {} }
 async function saveSessions() { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions)); } catch (e) {} }
@@ -654,6 +690,8 @@ function renderCats() {
 
   const mCat = document.getElementById('m-cat');
   mCat.innerHTML = categories.map(c => '<option value="' + c.id + '">' + c.name + '</option>').join('');
+  const placeCat = document.getElementById('place-cat');
+  if (placeCat) placeCat.innerHTML = categories.map(c => '<option value="' + c.id + '">' + c.name + '</option>').join('');
 }
 
 async function selectCategory(id) {
@@ -687,6 +725,7 @@ function render() {
   renderTotals();
   renderLog();
   renderCatManage();
+  renderPlaces();
 }
 
 function computeTotals(range) {
@@ -934,12 +973,139 @@ document.getElementById('export-btn').addEventListener('click', () => {
   XLSX.writeFile(wb, filename);
 });
 
+function renderPlaces() {
+  const list = document.getElementById('place-list');
+  if (!list) return;
+  if (places.length === 0) {
+    list.innerHTML = '<div class="note">Noch keine Orte gespeichert.</div>';
+  } else {
+    list.innerHTML = places.map(p => {
+      const cat = catById(p.categoryId);
+      return '<div class="cat-manage-row"><span class="dot" style="background:' + (cat ? cat.color : '#999') + '"></span><span class="name">' + p.name + ' · ' + (cat ? cat.name : '–') + ' · ' + p.radius + ' m</span><button data-id="' + p.id + '">Entfernen</button></div>';
+    }).join('');
+    list.querySelectorAll('button').forEach(b => {
+      b.addEventListener('click', async () => {
+        places = places.filter(p => p.id !== b.getAttribute('data-id'));
+        delete insideMap[b.getAttribute('data-id')];
+        await savePlaces();
+        renderPlaces();
+      });
+    });
+  }
+  updateAutoStatus();
+}
+
+function updateAutoStatus() {
+  const btn = document.getElementById('auto-toggle');
+  if (!btn) return;
+  const on = watchId !== null;
+  btn.textContent = on ? 'Automatik ausschalten' : 'Automatik einschalten';
+  btn.classList.toggle('running', on);
+}
+
+function distanceMeters(lat1, lon1, lat2, lon2) {
+  const R = 6371000;
+  const toRad = x => x * Math.PI / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+async function handleEnterPlace(place) {
+  if (active && active.categoryId === place.categoryId) return;
+  if (active) await stopActive();
+  selectedCat = place.categoryId;
+  active = { start: Date.now(), categoryId: place.categoryId };
+  await saveActive();
+  if (tickHandle) clearInterval(tickHandle);
+  tickHandle = setInterval(tick, 1000);
+  tick();
+  render();
+}
+
+async function handleExitPlace(place) {
+  if (active && active.categoryId === place.categoryId) {
+    await stopActive();
+    render();
+  }
+}
+
+async function onPosition(pos) {
+  const { latitude, longitude } = pos.coords;
+  for (const p of places) {
+    const d = distanceMeters(latitude, longitude, p.lat, p.lng);
+    const isInside = d <= p.radius;
+    const wasInside = insideMap[p.id] || false;
+    if (isInside && !wasInside) {
+      insideMap[p.id] = true;
+      await handleEnterPlace(p);
+    } else if (!isInside && wasInside) {
+      insideMap[p.id] = false;
+      await handleExitPlace(p);
+    }
+  }
+  const statusEl = document.getElementById('auto-status');
+  if (statusEl) statusEl.textContent = 'Aktiv – zuletzt geprüft: ' + new Date().toLocaleTimeString('de-DE');
+}
+
+function onPosError(err) {
+  const statusEl = document.getElementById('auto-status');
+  if (statusEl) statusEl.textContent = 'Standortfehler: ' + err.message;
+}
+
+function startLocationWatch() {
+  if (!navigator.geolocation) { alert('Standort wird von diesem Browser nicht unterstützt.'); return; }
+  watchId = navigator.geolocation.watchPosition(onPosition, onPosError, { enableHighAccuracy: true, maximumAge: 10000, timeout: 20000 });
+  localStorage.setItem(AUTO_KEY, '1');
+  updateAutoStatus();
+}
+
+function stopLocationWatch() {
+  if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+  watchId = null;
+  localStorage.setItem(AUTO_KEY, '0');
+  const statusEl = document.getElementById('auto-status');
+  if (statusEl) statusEl.textContent = 'Automatik ist aus.';
+  updateAutoStatus();
+}
+
+document.getElementById('auto-toggle').addEventListener('click', () => {
+  if (watchId !== null) stopLocationWatch(); else startLocationWatch();
+});
+
+document.getElementById('place-use-location').addEventListener('click', () => {
+  if (!navigator.geolocation) { alert('Standort wird von diesem Browser nicht unterstützt.'); return; }
+  navigator.geolocation.getCurrentPosition(pos => {
+    document.getElementById('place-lat').value = pos.coords.latitude.toFixed(6);
+    document.getElementById('place-lng').value = pos.coords.longitude.toFixed(6);
+  }, err => alert('Standort konnte nicht ermittelt werden: ' + err.message));
+});
+
+document.getElementById('place-add').addEventListener('click', async () => {
+  const name = document.getElementById('place-name').value.trim();
+  const catId = document.getElementById('place-cat').value;
+  const lat = parseFloat(document.getElementById('place-lat').value);
+  const lng = parseFloat(document.getElementById('place-lng').value);
+  const radius = parseFloat(document.getElementById('place-radius').value) || 100;
+  if (!name || isNaN(lat) || isNaN(lng) || !catId) { alert('Bitte Namen, Kategorie und Standort angeben.'); return; }
+  places.push({ id: 'p' + Date.now().toString(36), name, categoryId: catId, lat, lng, radius });
+  await savePlaces();
+  document.getElementById('place-name').value = '';
+  document.getElementById('place-lat').value = '';
+  document.getElementById('place-lng').value = '';
+  renderPlaces();
+});
+
 (async function init() {
   await load();
   render();
   if (active) {
     tickHandle = setInterval(tick, 1000);
     tick();
+  }
+  if (localStorage.getItem(AUTO_KEY) === '1' && places.length > 0) {
+    startLocationWatch();
   }
 })();
 </script>
