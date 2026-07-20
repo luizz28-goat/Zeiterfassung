@@ -580,10 +580,12 @@ function sendToSheet(session) {
     person: name,
     kategorie: cat ? cat.name : 'Gelöscht',
     datum: sd.toLocaleDateString('de-DE'),
+    datumISO: sd.toISOString().slice(0, 10),
     start: fmtTime(sd),
     ende: fmtTime(ed),
     dauerStunden: Math.round((session.duration / 3600000) * 100) / 100,
-    dauerHHMM: fmtDur(session.duration)
+    dauerHHMM: fmtDur(session.duration),
+    monat: sd.getFullYear() + '-' + String(sd.getMonth() + 1).padStart(2, '0')
   };
   fetch(url, {
     method: 'POST',
