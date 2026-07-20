@@ -429,6 +429,7 @@
     <span>
       <button class="toggle active" id="tab-today" data-range="today">Heute</button>
       <button class="toggle" id="tab-week" data-range="week">Woche</button>
+      <button class="toggle" id="tab-month" data-range="month">Monat</button>
     </span>
   </div>
   <div class="totals-table" id="totals-table"></div>
@@ -473,6 +474,11 @@
     </div>
     <div class="note" id="sync-status"></div>
     <div class="note">Jeder Stop wird automatisch an diese Adresse gesendet und landet als neue Zeile in eurer gemeinsamen Google-Tabelle. Lokal bleibt trotzdem alles zusätzlich gespeichert.</div>
+    <div style="margin-top:14px;">
+      <button class="export-btn" id="sync-all-btn">Bestehende Zeiten jetzt an Tabelle senden</button>
+    </div>
+    <div class="note" id="sync-all-status"></div>
+    <div class="note">Sendet alle bisher lokal gespeicherten Einträge einmalig nach. Nutze das nur einmal je Gerät – sonst landen Einträge doppelt in der Tabelle.</div>
   </details>
 
   <details class="cat-manage">
@@ -539,6 +545,9 @@ function startOfWeek(d) {
   res.setHours(0, 0, 0, 0);
   return res;
 }
+function startOfMonth(d) {
+  return new Date(d.getFullYear(), d.getMonth(), 1, 0, 0, 0, 0);
+}
 function catById(id) { return categories.find(c => c.id === id); }
 
 async function load() {
@@ -604,6 +613,26 @@ document.getElementById('sync-save').addEventListener('click', () => {
   status.textContent = url ? 'Gespeichert. Neue Stopps werden jetzt an die Tabelle gesendet.' : 'Gespeichert. Kein Link hinterlegt, Sync ist aus.';
 });
 
+document.getElementById('sync-all-btn').addEventListener('click', async () => {
+  const url = localStorage.getItem(SYNC_URL_KEY);
+  const statusEl = document.getElementById('sync-all-status');
+  if (!url) { statusEl.textContent = 'Bitte zuerst oben Name und Link speichern.'; return; }
+  if (sessions.length === 0) { statusEl.textContent = 'Keine lokalen Einträge vorhanden.'; return; }
+  if (!confirm('Alle ' + sessions.length + ' lokal gespeicherten Einträge jetzt an die Tabelle senden?')) return;
+
+  const btn = document.getElementById('sync-all-btn');
+  btn.disabled = true;
+  let sent = 0;
+  for (const s of sessions) {
+    sendToSheet(s);
+    sent++;
+    statusEl.textContent = sent + ' von ' + sessions.length + ' gesendet...';
+    await new Promise(r => setTimeout(r, 250));
+  }
+  statusEl.textContent = 'Fertig: ' + sent + ' Einträge gesendet. Prüfe die Tabelle.';
+  btn.disabled = false;
+});
+
 function renderCats() {
   const wrap = document.getElementById('cats');
   let html = '';
@@ -664,18 +693,23 @@ function computeTotals(range) {
   const now = new Date();
   const todayKey = dateKey(now);
   const weekStart = startOfWeek(now);
+  const monthStart = startOfMonth(now);
   const byCat = {};
   categories.forEach(c => byCat[c.id] = 0);
 
+  function inRange(sd) {
+    if (range === 'today') return dateKey(sd) === todayKey;
+    if (range === 'week') return sd >= weekStart;
+    return sd >= monthStart;
+  }
+
   sessions.forEach(s => {
     const sd = new Date(s.start);
-    const inRange = range === 'today' ? dateKey(sd) === todayKey : sd >= weekStart;
-    if (inRange) byCat[s.categoryId] = (byCat[s.categoryId] || 0) + s.duration;
+    if (inRange(sd)) byCat[s.categoryId] = (byCat[s.categoryId] || 0) + s.duration;
   });
   if (active) {
     const sd = new Date(active.start);
-    const inRange = range === 'today' ? dateKey(sd) === todayKey : sd >= weekStart;
-    if (inRange) byCat[active.categoryId] = (byCat[active.categoryId] || 0) + (now - active.start);
+    if (inRange(sd)) byCat[active.categoryId] = (byCat[active.categoryId] || 0) + (now - active.start);
   }
   return byCat;
 }
@@ -695,6 +729,7 @@ function renderTotals() {
 
   document.getElementById('tab-today').classList.toggle('active', currentRange === 'today');
   document.getElementById('tab-week').classList.toggle('active', currentRange === 'week');
+  document.getElementById('tab-month').classList.toggle('active', currentRange === 'month');
 }
 
 function renderLog() {
@@ -811,6 +846,7 @@ document.getElementById('toggle-btn').addEventListener('click', toggle);
 
 document.getElementById('tab-today').addEventListener('click', () => { currentRange = 'today'; renderTotals(); });
 document.getElementById('tab-week').addEventListener('click', () => { currentRange = 'week'; renderTotals(); });
+document.getElementById('tab-month').addEventListener('click', () => { currentRange = 'month'; renderTotals(); });
 
 document.getElementById('m-add').addEventListener('click', async () => {
   const catId = document.getElementById('m-cat').value;
