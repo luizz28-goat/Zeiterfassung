@@ -1104,6 +1104,9 @@ document.getElementById('place-add').addEventListener('click', async () => {
     tickHandle = setInterval(tick, 1000);
     tick();
   }
+  places.forEach(p => {
+    if (active && active.categoryId === p.categoryId) insideMap[p.id] = true;
+  });
   if (localStorage.getItem(AUTO_KEY) === '1' && places.length > 0) {
     startLocationWatch();
   }
