@@ -630,7 +630,8 @@ function sendToSheet(session) {
     ende: fmtTime(ed),
     dauerStunden: Math.round((session.duration / 3600000) * 100) / 100,
     dauerHHMM: fmtDur(session.duration),
-    monat: sd.getFullYear() + '-' + String(sd.getMonth() + 1).padStart(2, '0')
+    monat: sd.getFullYear() + '-' + String(sd.getMonth() + 1).padStart(2, '0'),
+    sessionId: name + '::' + session.id
   };
   fetch(url, {
     method: 'POST',
