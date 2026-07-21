@@ -38,7 +38,7 @@
     .clock-card { flex-direction: column; align-items: stretch; gap: 18px; padding: 22px 18px; }
     .clock-display { font-size: 32px; }
     button.stamp { width: 100%; padding: 16px; }
-    .entry { grid-template-columns: 1fr auto auto; font-size: 13px; }
+    .entry { grid-template-columns: 1fr auto auto auto; font-size: 13px; }
     .manual-form { flex-direction: column; align-items: stretch; }
     .manual-form label, .manual-form input, .manual-form select, .manual-form button { width: 100%; }
     .export-btn { width: 100%; }
@@ -233,7 +233,7 @@
 
   .entry {
     display: grid;
-    grid-template-columns: auto 1fr auto auto;
+    grid-template-columns: auto 1fr auto auto auto;
     align-items: center;
     gap: 10px;
     padding: 10px 2px;
@@ -245,15 +245,16 @@
   .entry .times { font-family: 'JetBrains Mono', monospace; color: var(--ink-soft); font-size: 13px; }
   .entry .dur { font-family: 'JetBrains Mono', monospace; font-weight: 500; text-align: right; min-width: 55px; }
 
-  .entry button.del {
+  .entry button.del, .entry button.edit {
     background: none;
     border: none;
     color: var(--ink-soft);
     cursor: pointer;
-    font-size: 13px;
+    font-size: 14px;
     padding: 4px;
   }
   .entry button.del:hover { color: #A83A2E; }
+  .entry button.edit:hover { color: var(--ink); }
 
   .empty {
     text-align: center;
@@ -424,6 +425,8 @@
     <button class="stamp" id="toggle-btn">Start</button>
   </div>
 
+  <div class="note" id="current-place-status" style="margin:-8px 0 20px 2px;"></div>
+
   <div class="totals-head">
     <span style="font-size:13px; color:var(--ink-soft); text-transform:uppercase; letter-spacing:0.06em;">Summen</span>
     <span>
@@ -440,8 +443,8 @@
   <div class="log-heading">Verlauf</div>
   <div id="log"></div>
 
-  <details class="manual">
-    <summary>Zeit nachträglich eintragen</summary>
+  <details class="manual" id="manual-details">
+    <summary id="manual-summary">Zeit nachträglich eintragen</summary>
     <div class="manual-form">
       <label>Kategorie
         <select id="m-cat"></select>
@@ -456,8 +459,9 @@
         <input type="time" id="m-end">
       </label>
       <button id="m-add">Eintragen</button>
+      <button id="m-cancel" class="export-btn" style="display:none;">Abbrechen</button>
     </div>
-    <div class="note">Für Zeiten, die du vergessen hast automatisch zu erfassen.</div>
+    <div class="note">Für Zeiten, die du vergessen hast automatisch zu erfassen, oder zum Bearbeiten eines bestehenden Eintrags.</div>
   </details>
 
   <details class="cat-manage">
@@ -798,12 +802,17 @@ function renderLog() {
       html += '<span class="dot" style="background:' + color + '"></span>';
       html += '<div class="times">' + name + ' · ' + fmtTime(new Date(s.start)) + '–' + fmtTime(new Date(s.end)) + '</div>';
       html += '<div class="dur">' + fmtDur(s.duration) + '</div>';
+      html += '<button class="edit" data-id="' + s.id + '" aria-label="Eintrag bearbeiten">✎</button>';
       html += '<button class="del" data-id="' + s.id + '" aria-label="Eintrag löschen">✕</button>';
       html += '</div>';
     });
     html += '</div>';
   });
   log.innerHTML = html;
+
+  log.querySelectorAll('.edit').forEach(b => {
+    b.addEventListener('click', () => startEditSession(b.getAttribute('data-id')));
+  });
 
   log.querySelectorAll('.del').forEach(b => {
     b.addEventListener('click', async () => {
@@ -885,6 +894,44 @@ document.getElementById('toggle-btn').addEventListener('click', toggle);
 document.getElementById('tab-week').addEventListener('click', () => { currentRange = 'week'; renderTotals(); });
 document.getElementById('tab-month').addEventListener('click', () => { currentRange = 'month'; renderTotals(); });
 
+let editingId = null;
+
+function toDateInputValue(d) {
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+function toTimeInputValue(d) {
+  return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+}
+
+function startEditSession(id) {
+  const session = sessions.find(s => String(s.id) === String(id));
+  if (!session) return;
+  editingId = id;
+  const sd = new Date(session.start);
+  const ed = new Date(session.end);
+  document.getElementById('m-cat').value = session.categoryId;
+  document.getElementById('m-date').value = toDateInputValue(sd);
+  document.getElementById('m-start').value = toTimeInputValue(sd);
+  document.getElementById('m-end').value = toTimeInputValue(ed);
+  document.getElementById('m-add').textContent = 'Änderungen speichern';
+  document.getElementById('m-cancel').style.display = 'inline-block';
+  document.getElementById('manual-summary').textContent = 'Eintrag bearbeiten';
+  document.getElementById('manual-details').open = true;
+  document.getElementById('manual-details').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function cancelEdit() {
+  editingId = null;
+  document.getElementById('m-date').value = '';
+  document.getElementById('m-start').value = '';
+  document.getElementById('m-end').value = '';
+  document.getElementById('m-add').textContent = 'Eintragen';
+  document.getElementById('m-cancel').style.display = 'none';
+  document.getElementById('manual-summary').textContent = 'Zeit nachträglich eintragen';
+}
+
+document.getElementById('m-cancel').addEventListener('click', cancelEdit);
+
 document.getElementById('m-add').addEventListener('click', async () => {
   const catId = document.getElementById('m-cat').value;
   const dateVal = document.getElementById('m-date').value;
@@ -894,6 +941,19 @@ document.getElementById('m-add').addEventListener('click', async () => {
   const start = new Date(dateVal + 'T' + startVal + ':00');
   const end = new Date(dateVal + 'T' + endVal + ':00');
   if (end <= start) { alert('Ende muss nach dem Start liegen.'); return; }
+
+  if (editingId) {
+    const idx = sessions.findIndex(s => String(s.id) === String(editingId));
+    if (idx !== -1) {
+      sessions[idx] = { ...sessions[idx], categoryId: catId, start: start.getTime(), end: end.getTime(), duration: end.getTime() - start.getTime() };
+      await saveSessions();
+      sendToSheet(sessions[idx]);
+    }
+    cancelEdit();
+    render();
+    return;
+  }
+
   const session = { id: start.getTime(), categoryId: catId, start: start.getTime(), end: end.getTime(), duration: end.getTime() - start.getTime() };
   sessions.push(session);
   await saveSessions();
@@ -968,6 +1028,21 @@ document.getElementById('export-btn').addEventListener('click', () => {
   });
 
   const filename = 'Zeitkonto_' + new Date().toISOString().slice(0, 10) + '.xlsx';
+
+  try {
+    const wbArray = XLSX.write(wb, { type: 'array', bookType: 'xlsx' });
+    const blob = new Blob([wbArray], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const file = new File([blob], filename, { type: blob.type });
+
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      navigator.share({ files: [file], title: filename }).catch(() => {
+        XLSX.writeFile(wb, filename);
+      });
+      return;
+    }
+  } catch (e) {
+    console.error('Teilen fehlgeschlagen, nutze Standard-Download:', e);
+  }
   XLSX.writeFile(wb, filename);
 });
 
@@ -1031,10 +1106,12 @@ async function handleExitPlace(place) {
 
 async function onPosition(pos) {
   const { latitude, longitude } = pos.coords;
+  const currentlyInside = [];
   for (const p of places) {
     const d = distanceMeters(latitude, longitude, p.lat, p.lng);
     const isInside = d <= p.radius;
     const wasInside = insideMap[p.id] || false;
+    if (isInside) currentlyInside.push(p);
     if (isInside && !wasInside) {
       insideMap[p.id] = true;
       await handleEnterPlace(p);
@@ -1045,6 +1122,13 @@ async function onPosition(pos) {
   }
   const statusEl = document.getElementById('auto-status');
   if (statusEl) statusEl.textContent = 'Aktiv – zuletzt geprüft: ' + new Date().toLocaleTimeString('de-DE');
+
+  const placeStatusEl = document.getElementById('current-place-status');
+  if (placeStatusEl) {
+    placeStatusEl.textContent = currentlyInside.length > 0
+      ? '📍 Du bist gerade bei: ' + currentlyInside.map(p => p.name).join(', ')
+      : '';
+  }
 }
 
 function onPosError(err) {
