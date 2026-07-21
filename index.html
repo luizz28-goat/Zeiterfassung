@@ -1140,6 +1140,14 @@ function initMsal() {
     },
     cache: { cacheLocation: 'localStorage' }
   });
+  msalInstance.handleRedirectPromise().then(response => {
+    if (response && response.account) {
+      msalInstance.setActiveAccount(response.account);
+    }
+    updateMsStatus();
+  }).catch(err => {
+    console.error('Redirect-Fehler:', err);
+  });
 }
 
 function getMsAccount() {
@@ -1158,9 +1166,8 @@ function updateMsStatus() {
 async function msLogin() {
   if (!msalInstance) { alert('Bitte zuerst Client-ID speichern.'); return; }
   try {
-    const result = await msalInstance.loginPopup({ scopes: ['Files.ReadWrite'] });
-    msalInstance.setActiveAccount(result.account);
-    updateMsStatus();
+    await msalInstance.loginRedirect({ scopes: ['Files.ReadWrite'] });
+    // Seite leitet jetzt zu Microsoft weiter und kehrt danach automatisch zurück.
   } catch (err) {
     alert('Anmeldung fehlgeschlagen: ' + err.message);
   }
@@ -1175,8 +1182,8 @@ async function getGraphToken() {
     return result.accessToken;
   } catch (e) {
     try {
-      const result = await msalInstance.acquireTokenPopup({ scopes: ['Files.ReadWrite'], account: account });
-      return result.accessToken;
+      await msalInstance.acquireTokenRedirect({ scopes: ['Files.ReadWrite'], account: account });
+      return null; // Seite leitet weiter; Token kommt erst nach Rückkehr
     } catch (e2) {
       return null;
     }
