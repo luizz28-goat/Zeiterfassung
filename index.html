@@ -462,6 +462,27 @@
   </details>
 
   <details class="cat-manage">
+    <summary>Cloud-Synchronisierung (Excel / Microsoft)</summary>
+    <div class="note">Alternative zu Google: schreibt direkt in eine gemeinsame Excel-Datei in OneDrive. Erfordert einmalig eine App-Registrierung bei Microsoft (Anleitung von Claude) und eine Anmeldung mit deinem Microsoft-Konto.</div>
+    <div class="manual-form" style="margin-top:14px;">
+      <label style="flex:1; min-width:220px;">Client-ID (aus der Azure-App-Registrierung)
+        <input type="text" id="ms-client-id" placeholder="z. B. 3fa2b1c4-...">
+      </label>
+      <label style="flex:1; min-width:220px;">Freigabe-Link der Excel-Datei
+        <input type="text" id="ms-share-url" placeholder="https://onedrive.live.com/...">
+      </label>
+      <button id="ms-save">Speichern</button>
+    </div>
+    <div class="note" id="ms-config-status"></div>
+    <div style="margin-top:14px; display:flex; gap:10px; flex-wrap:wrap;">
+      <button class="export-btn" id="ms-login-btn">Mit Microsoft anmelden</button>
+      <button class="export-btn" id="ms-sync-all-btn">Bestehende Zeiten an Excel senden</button>
+    </div>
+    <div class="note" id="ms-status">Nicht angemeldet.</div>
+    <div class="note">Wichtig: Diese Excel-Anbindung hat aktuell keine serverseitige Duplikat-Prüfung wie bei Google – "Bestehende Zeiten senden" merkt sich nur auf diesem Gerät, was schon geschickt wurde.</div>
+  </details>
+
+  <details class="cat-manage">
     <summary>Cloud-Synchronisierung (gemeinsame Tabelle)</summary>
     <div class="manual-form" style="margin-top:14px;">
       <label>Dein Name
@@ -523,6 +544,7 @@
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://alcdn.msauth.net/browser/3.7.1/js/msal-browser.min.js"></script>
 <script>
 const CATS_KEY = 'categories';
 const STORAGE_KEY = 'work-sessions';
@@ -531,6 +553,9 @@ const SYNC_NAME_KEY = 'sync-person-name';
 const SYNC_URL_KEY = 'sync-sheet-url';
 const PLACES_KEY = 'places';
 const AUTO_KEY = 'auto-tracking-enabled';
+const MS_CLIENT_ID_KEY = 'ms-client-id';
+const MS_SHARE_URL_KEY = 'ms-share-url';
+const MS_SYNCED_IDS_KEY = 'ms-synced-ids';
 
 const PALETTE = ['#A83A2E', '#3B6E8F', '#5B7B3F', '#8B5FA0', '#B8862E', '#4F4F4F'];
 const DEFAULT_CATS = [
@@ -601,6 +626,8 @@ async function load() {
 
   document.getElementById('sync-name').value = localStorage.getItem(SYNC_NAME_KEY) || '';
   document.getElementById('sync-url').value = localStorage.getItem(SYNC_URL_KEY) || '';
+  document.getElementById('ms-client-id').value = localStorage.getItem(MS_CLIENT_ID_KEY) || '';
+  document.getElementById('ms-share-url').value = localStorage.getItem(MS_SHARE_URL_KEY) || '';
 }
 
 async function savePlaces() { try { localStorage.setItem(PLACES_KEY, JSON.stringify(places)); } catch (e) {} }
@@ -865,6 +892,7 @@ async function stopActive() {
   await saveSessions();
   await saveActive();
   sendToSheet(session);
+  appendRowToExcel(session);
   if (tickHandle) clearInterval(tickHandle);
   document.getElementById('clock-display').textContent = '00:00:00';
 }
@@ -901,6 +929,7 @@ document.getElementById('m-add').addEventListener('click', async () => {
   sessions.push(session);
   await saveSessions();
   sendToSheet(session);
+  appendRowToExcel(session);
   document.getElementById('m-date').value = '';
   document.getElementById('m-start').value = '';
   document.getElementById('m-end').value = '';
@@ -1098,9 +1127,141 @@ document.getElementById('place-add').addEventListener('click', async () => {
   renderPlaces();
 });
 
+let msalInstance = null;
+
+function initMsal() {
+  const clientId = localStorage.getItem(MS_CLIENT_ID_KEY);
+  if (!clientId || typeof msal === 'undefined') { msalInstance = null; return; }
+  msalInstance = new msal.PublicClientApplication({
+    auth: {
+      clientId: clientId,
+      authority: 'https://login.microsoftonline.com/common',
+      redirectUri: window.location.origin + window.location.pathname
+    },
+    cache: { cacheLocation: 'localStorage' }
+  });
+}
+
+function getMsAccount() {
+  if (!msalInstance) return null;
+  const accounts = msalInstance.getAllAccounts();
+  return accounts.length > 0 ? accounts[0] : null;
+}
+
+function updateMsStatus() {
+  const statusEl = document.getElementById('ms-status');
+  if (!statusEl) return;
+  const account = getMsAccount();
+  statusEl.textContent = account ? 'Angemeldet als ' + account.username : 'Nicht angemeldet.';
+}
+
+async function msLogin() {
+  if (!msalInstance) { alert('Bitte zuerst Client-ID speichern.'); return; }
+  try {
+    const result = await msalInstance.loginPopup({ scopes: ['Files.ReadWrite'] });
+    msalInstance.setActiveAccount(result.account);
+    updateMsStatus();
+  } catch (err) {
+    alert('Anmeldung fehlgeschlagen: ' + err.message);
+  }
+}
+
+async function getGraphToken() {
+  if (!msalInstance) return null;
+  const account = getMsAccount();
+  if (!account) return null;
+  try {
+    const result = await msalInstance.acquireTokenSilent({ scopes: ['Files.ReadWrite'], account: account });
+    return result.accessToken;
+  } catch (e) {
+    try {
+      const result = await msalInstance.acquireTokenPopup({ scopes: ['Files.ReadWrite'], account: account });
+      return result.accessToken;
+    } catch (e2) {
+      return null;
+    }
+  }
+}
+
+function encodeShareUrl(url) {
+  let base64 = btoa(unescape(encodeURIComponent(url)));
+  base64 = base64.replace(/=+$/, '').replace(/\//g, '_').replace(/\+/g, '-');
+  return 'u!' + base64;
+}
+
+function getSyncedIds() {
+  try { return JSON.parse(localStorage.getItem(MS_SYNCED_IDS_KEY) || '[]'); } catch (e) { return []; }
+}
+function markSynced(id) {
+  const ids = getSyncedIds();
+  ids.push(id);
+  localStorage.setItem(MS_SYNCED_IDS_KEY, JSON.stringify(ids));
+}
+
+async function appendRowToExcel(session) {
+  const shareUrl = localStorage.getItem(MS_SHARE_URL_KEY);
+  if (!shareUrl || !msalInstance || !getMsAccount()) return;
+  const uniqueId = 'ms::' + (localStorage.getItem(SYNC_NAME_KEY) || 'Unbekannt') + '::' + session.id;
+  if (getSyncedIds().indexOf(uniqueId) !== -1) return;
+
+  const token = await getGraphToken();
+  if (!token) return;
+  const shareId = encodeShareUrl(shareUrl);
+  const name = localStorage.getItem(SYNC_NAME_KEY) || 'Unbekannt';
+  const sd = new Date(session.start);
+  const ed = new Date(session.end);
+  const cat = catById(session.categoryId);
+  const durationHours = Math.round((session.duration / 3600000) * 100) / 100;
+  const row = [[name, cat ? cat.name : 'Gelöscht', sd.toLocaleDateString('de-DE'), fmtTime(sd), fmtTime(ed), durationHours]];
+
+  try {
+    const resp = await fetch('https://graph.microsoft.com/v1.0/shares/' + shareId + '/driveItem/workbook/tables/ZeitenTable/rows/add', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ values: row })
+    });
+    if (resp.ok) {
+      markSynced(uniqueId);
+    } else {
+      console.error('Excel-Sync fehlgeschlagen:', resp.status, await resp.text());
+    }
+  } catch (e) {
+    console.error('Excel-Sync Fehler:', e);
+  }
+}
+
+document.getElementById('ms-save').addEventListener('click', () => {
+  const clientId = document.getElementById('ms-client-id').value.trim();
+  const shareUrl = document.getElementById('ms-share-url').value.trim();
+  localStorage.setItem(MS_CLIENT_ID_KEY, clientId);
+  localStorage.setItem(MS_SHARE_URL_KEY, shareUrl);
+  initMsal();
+  updateMsStatus();
+  document.getElementById('ms-config-status').textContent = 'Gespeichert.';
+});
+
+document.getElementById('ms-login-btn').addEventListener('click', msLogin);
+
+document.getElementById('ms-sync-all-btn').addEventListener('click', async () => {
+  if (!getMsAccount()) { alert('Bitte zuerst mit Microsoft anmelden.'); return; }
+  if (sessions.length === 0) { alert('Keine lokalen Einträge vorhanden.'); return; }
+  if (!confirm('Alle lokal gespeicherten Einträge (noch nicht gesendete) an Excel senden?')) return;
+  const statusEl = document.getElementById('ms-status');
+  let sent = 0;
+  for (const s of sessions) {
+    await appendRowToExcel(s);
+    sent++;
+    statusEl.textContent = sent + ' von ' + sessions.length + ' geprüft...';
+    await new Promise(r => setTimeout(r, 300));
+  }
+  statusEl.textContent = 'Fertig geprüft: ' + sent + ' Einträge (bereits gesendete wurden übersprungen).';
+});
+
 (async function init() {
   await load();
   render();
+  initMsal();
+  updateMsStatus();
   if (active) {
     tickHandle = setInterval(tick, 1000);
     tick();
