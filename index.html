@@ -442,6 +442,7 @@
 
   <div class="log-heading">Verlauf</div>
   <div id="log"></div>
+  <div id="log-more"></div>
 
   <details class="manual" id="manual-details">
     <summary id="manual-summary">Zeit nachträglich eintragen</summary>
@@ -545,6 +546,7 @@ let sessions = [];
 let active = null;
 let selectedCat = null;
 let currentRange = 'week';
+let logRangeStart = null;
 let tickHandle = null;
 let places = [];
 let watchId = null;
@@ -774,54 +776,91 @@ function renderTotals() {
   document.getElementById('tab-month').classList.toggle('active', currentRange === 'month');
 }
 
+function resetLogRange() {
+  logRangeStart = currentRange === 'month' ? startOfMonth(new Date()) : startOfWeek(new Date());
+}
+
+function extendLogRange() {
+  const d = new Date(logRangeStart);
+  if (currentRange === 'month') {
+    d.setMonth(d.getMonth() - 1);
+  } else {
+    d.setDate(d.getDate() - 7);
+  }
+  logRangeStart = d;
+}
+
 function renderLog() {
   const log = document.getElementById('log');
+  const more = document.getElementById('log-more');
+  if (!logRangeStart) resetLogRange();
+
   if (sessions.length === 0) {
     log.innerHTML = '<div class="empty">Noch keine Einträge. Wähle eine Kategorie und drücke Start.</div>';
+    more.innerHTML = '';
     return;
   }
-  const sorted = [...sessions].sort((a, b) => b.start - a.start);
-  const groups = {};
-  sorted.forEach(s => {
-    const k = dateKey(new Date(s.start));
-    if (!groups[k]) groups[k] = [];
-    groups[k].push(s);
-  });
 
-  let html = '';
-  Object.keys(groups).sort().reverse().forEach(k => {
-    const entries = groups[k];
-    const dayTotal = entries.reduce((sum, s) => sum + s.duration, 0);
-    html += '<div class="day-group">';
-    html += '<div class="day-head"><span>' + fmtDate(new Date(k)) + '</span><span class="day-total">' + fmtDur(dayTotal) + '</span></div>';
-    entries.forEach(s => {
-      const cat = catById(s.categoryId);
-      const color = cat ? cat.color : '#999';
-      const name = cat ? cat.name : 'Gelöscht';
-      html += '<div class="entry">';
-      html += '<span class="dot" style="background:' + color + '"></span>';
-      html += '<div class="times">' + name + ' · ' + fmtTime(new Date(s.start)) + '–' + fmtTime(new Date(s.end)) + '</div>';
-      html += '<div class="dur">' + fmtDur(s.duration) + '</div>';
-      html += '<button class="edit" data-id="' + s.id + '" aria-label="Eintrag bearbeiten">✎</button>';
-      html += '<button class="del" data-id="' + s.id + '" aria-label="Eintrag löschen">✕</button>';
+  const visible = sessions.filter(s => new Date(s.start) >= logRangeStart);
+  const hasOlder = visible.length < sessions.length;
+
+  if (visible.length === 0) {
+    log.innerHTML = '<div class="empty">Keine Einträge in diesem Zeitraum.</div>';
+  } else {
+    const sorted = [...visible].sort((a, b) => b.start - a.start);
+    const groups = {};
+    sorted.forEach(s => {
+      const k = dateKey(new Date(s.start));
+      if (!groups[k]) groups[k] = [];
+      groups[k].push(s);
+    });
+
+    let html = '';
+    Object.keys(groups).sort().reverse().forEach(k => {
+      const entries = groups[k];
+      const dayTotal = entries.reduce((sum, s) => sum + s.duration, 0);
+      html += '<div class="day-group">';
+      html += '<div class="day-head"><span>' + fmtDate(new Date(k)) + '</span><span class="day-total">' + fmtDur(dayTotal) + '</span></div>';
+      entries.forEach(s => {
+        const cat = catById(s.categoryId);
+        const color = cat ? cat.color : '#999';
+        const name = cat ? cat.name : 'Gelöscht';
+        html += '<div class="entry">';
+        html += '<span class="dot" style="background:' + color + '"></span>';
+        html += '<div class="times">' + name + ' · ' + fmtTime(new Date(s.start)) + '–' + fmtTime(new Date(s.end)) + '</div>';
+        html += '<div class="dur">' + fmtDur(s.duration) + '</div>';
+        html += '<button class="edit" data-id="' + s.id + '" aria-label="Eintrag bearbeiten">✎</button>';
+        html += '<button class="del" data-id="' + s.id + '" aria-label="Eintrag löschen">✕</button>';
+        html += '</div>';
+      });
       html += '</div>';
     });
-    html += '</div>';
-  });
-  log.innerHTML = html;
+    log.innerHTML = html;
 
-  log.querySelectorAll('.edit').forEach(b => {
-    b.addEventListener('click', () => startEditSession(b.getAttribute('data-id')));
-  });
-
-  log.querySelectorAll('.del').forEach(b => {
-    b.addEventListener('click', async () => {
-      const id = b.getAttribute('data-id');
-      sessions = sessions.filter(s => String(s.id) !== id);
-      await saveSessions();
-      render();
+    log.querySelectorAll('.edit').forEach(b => {
+      b.addEventListener('click', () => startEditSession(b.getAttribute('data-id')));
     });
-  });
+
+    log.querySelectorAll('.del').forEach(b => {
+      b.addEventListener('click', async () => {
+        const id = b.getAttribute('data-id');
+        sessions = sessions.filter(s => String(s.id) !== id);
+        await saveSessions();
+        render();
+      });
+    });
+  }
+
+  more.innerHTML = hasOlder
+    ? '<button class="export-btn" id="load-more-btn" style="width:100%; margin-top:14px;">Mehr laden</button>'
+    : '';
+  const moreBtn = document.getElementById('load-more-btn');
+  if (moreBtn) {
+    moreBtn.addEventListener('click', () => {
+      extendLogRange();
+      renderLog();
+    });
+  }
 }
 
 function renderCatManage() {
@@ -891,8 +930,8 @@ async function toggle() {
 
 document.getElementById('toggle-btn').addEventListener('click', toggle);
 
-document.getElementById('tab-week').addEventListener('click', () => { currentRange = 'week'; renderTotals(); });
-document.getElementById('tab-month').addEventListener('click', () => { currentRange = 'month'; renderTotals(); });
+document.getElementById('tab-week').addEventListener('click', () => { currentRange = 'week'; renderTotals(); resetLogRange(); renderLog(); });
+document.getElementById('tab-month').addEventListener('click', () => { currentRange = 'month'; renderTotals(); resetLogRange(); renderLog(); });
 
 let editingId = null;
 
