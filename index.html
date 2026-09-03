@@ -706,6 +706,7 @@ async function selectCategory(id) {
   }
   selectedCat = id;
   renderCats();
+  renderTotals();
 }
 
 function render() {
@@ -762,14 +763,17 @@ function computeTotals(range) {
 function renderTotals() {
   const byCat = computeTotals(currentRange);
   const table = document.getElementById('totals-table');
+  const shown = selectedCat ? categories.filter(c => c.id === selectedCat) : categories;
   let html = '';
   let grand = 0;
-  categories.forEach(c => {
+  shown.forEach(c => {
     const val = byCat[c.id] || 0;
     grand += val;
     html += '<div class="totals-row"><span class="name"><span class="dot" style="background:' + c.color + '"></span>' + c.name + '</span><span class="val">' + fmtDur(val) + '</span></div>';
   });
-  html += '<div class="totals-row grand"><span class="name">Gesamt</span><span class="val">' + fmtDur(grand) + '</span></div>';
+  if (shown.length > 1) {
+    html += '<div class="totals-row grand"><span class="name">Gesamt</span><span class="val">' + fmtDur(grand) + '</span></div>';
+  }
   table.innerHTML = html;
 
   document.getElementById('tab-week').classList.toggle('active', currentRange === 'week');
@@ -1018,51 +1022,77 @@ document.getElementById('new-cat-add').addEventListener('click', async () => {
 
 const MONTH_NAMES = ['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
 
+function sanitizeSheetName(name, used) {
+  let base = name.replace(/[:\\\/\?\*\[\]]/g, '-').trim().slice(0, 31) || 'Kategorie';
+  let candidate = base;
+  let n = 2;
+  while (used.has(candidate)) {
+    candidate = (base.slice(0, 28) + ' ' + n).slice(0, 31);
+    n++;
+  }
+  used.add(candidate);
+  return candidate;
+}
+
 document.getElementById('export-btn').addEventListener('click', () => {
   if (sessions.length === 0) { alert('Noch keine Einträge zum Exportieren.'); return; }
 
-  const byMonth = {};
+  const byCat = {};
   sessions.forEach(s => {
-    const sd = new Date(s.start);
-    const key = sd.getFullYear() + '-' + String(sd.getMonth() + 1).padStart(2, '0');
-    if (!byMonth[key]) byMonth[key] = [];
-    byMonth[key].push(s);
+    if (!byCat[s.categoryId]) byCat[s.categoryId] = [];
+    byCat[s.categoryId].push(s);
   });
 
   const wb = XLSX.utils.book_new();
-  const monthKeys = Object.keys(byMonth).sort();
+  const usedSheetNames = new Set();
+  const catIds = Object.keys(byCat).sort((a, b) => {
+    const ca = catById(a), cb = catById(b);
+    return (ca ? ca.name : 'Gelöscht').localeCompare(cb ? cb.name : 'Gelöscht');
+  });
 
-  monthKeys.forEach(key => {
-    const entries = [...byMonth[key]].sort((a, b) => a.start - b.start);
-    const rows = entries.map(s => {
+  catIds.forEach(cid => {
+    const cat = catById(cid);
+    const catName = cat ? cat.name : 'Gelöscht';
+    const entries = [...byCat[cid]].sort((a, b) => a.start - b.start);
+
+    const byMonth = {};
+    entries.forEach(s => {
       const sd = new Date(s.start);
-      const ed = new Date(s.end);
-      const hours = Math.round((s.duration / 3600000) * 100) / 100;
-      const cat = catById(s.categoryId);
-      return {
-        'Kategorie': cat ? cat.name : 'Gelöscht',
-        'Datum': sd.toLocaleDateString('de-DE'),
-        'Start': fmtTime(sd),
-        'Ende': fmtTime(ed),
-        'Dauer (Std.)': hours,
-        'Dauer (hh:mm)': fmtDur(s.duration)
-      };
+      const key = sd.getFullYear() + '-' + String(sd.getMonth() + 1).padStart(2, '0');
+      if (!byMonth[key]) byMonth[key] = [];
+      byMonth[key].push(s);
     });
 
-    const byCat = {};
-    entries.forEach(s => { byCat[s.categoryId] = (byCat[s.categoryId] || 0) + s.duration; });
-    rows.push({ 'Kategorie': '', 'Datum': '', 'Start': '', 'Ende': '', 'Dauer (Std.)': '', 'Dauer (hh:mm)': '' });
-    Object.keys(byCat).forEach(cid => {
-      const cat = catById(cid);
-      rows.push({ 'Kategorie': (cat ? cat.name : 'Gelöscht') + ' – Summe', 'Datum': '', 'Start': '', 'Ende': '', 'Dauer (Std.)': Math.round((byCat[cid] / 3600000) * 100) / 100, 'Dauer (hh:mm)': fmtDur(byCat[cid]) });
-    });
-    const monthTotal = entries.reduce((sum, s) => sum + s.duration, 0);
-    rows.push({ 'Kategorie': 'Gesamt Monat', 'Datum': '', 'Start': '', 'Ende': '', 'Dauer (Std.)': Math.round((monthTotal / 3600000) * 100) / 100, 'Dauer (hh:mm)': fmtDur(monthTotal) });
+    const rows = [];
+    let catTotal = 0;
+    Object.keys(byMonth).sort().forEach(key => {
+      const monthEntries = byMonth[key];
+      const [year, month] = key.split('-');
+      const monthLabel = MONTH_NAMES[parseInt(month, 10) - 1] + ' ' + year;
 
-    const [year, month] = key.split('-');
-    const sheetName = (MONTH_NAMES[parseInt(month, 10) - 1] + ' ' + year).slice(0, 31);
+      monthEntries.forEach(s => {
+        const sd = new Date(s.start);
+        const ed = new Date(s.end);
+        rows.push({
+          'Monat': monthLabel,
+          'Datum': sd.toLocaleDateString('de-DE'),
+          'Start': fmtTime(sd),
+          'Ende': fmtTime(ed),
+          'Dauer (Std.)': Math.round((s.duration / 3600000) * 100) / 100,
+          'Dauer (hh:mm)': fmtDur(s.duration)
+        });
+      });
+
+      const monthTotal = monthEntries.reduce((sum, s) => sum + s.duration, 0);
+      catTotal += monthTotal;
+      rows.push({ 'Monat': monthLabel + ' – Summe', 'Datum': '', 'Start': '', 'Ende': '', 'Dauer (Std.)': Math.round((monthTotal / 3600000) * 100) / 100, 'Dauer (hh:mm)': fmtDur(monthTotal) });
+      rows.push({ 'Monat': '', 'Datum': '', 'Start': '', 'Ende': '', 'Dauer (Std.)': '', 'Dauer (hh:mm)': '' });
+    });
+    rows.push({ 'Monat': 'Gesamt ' + catName, 'Datum': '', 'Start': '', 'Ende': '', 'Dauer (Std.)': Math.round((catTotal / 3600000) * 100) / 100, 'Dauer (hh:mm)': fmtDur(catTotal) });
+
+    const sheetName = sanitizeSheetName(catName, usedSheetNames);
     const ws = XLSX.utils.json_to_sheet(rows);
-    ws['!cols'] = [{ wch: 14 }, { wch: 12 }, { wch: 8 }, { wch: 8 }, { wch: 12 }, { wch: 12 }];
+    ws['!cols'] = [{ wch: 16 }, { wch: 12 }, { wch: 8 }, { wch: 8 }, { wch: 12 }, { wch: 12 }];
     XLSX.utils.book_append_sheet(wb, ws, sheetName);
   });
 
