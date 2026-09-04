@@ -404,6 +404,127 @@
     cursor: pointer;
   }
   .export-btn:active { transform: scale(0.97); }
+
+  .badge {
+    display: inline-block;
+    background: var(--ink);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 600;
+    border-radius: 999px;
+    padding: 1px 7px;
+    margin-left: 6px;
+    vertical-align: middle;
+  }
+
+  .review-banner {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    background: #fff;
+    border: 1.5px solid var(--ink);
+    border-radius: 4px;
+    padding: 14px 16px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+  }
+  .review-banner-text { font-size: 14px; font-weight: 500; }
+
+  .reminders-list { display: flex; flex-direction: column; gap: 8px; margin-top: 14px; }
+
+  .reminder-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    background: #fff;
+    flex-wrap: wrap;
+  }
+  .reminder-main { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 160px; }
+  .reminder-text { font-size: 14px; }
+  .reminder-type-badge {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--ink-soft);
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 3px 8px;
+    cursor: pointer;
+    white-space: nowrap;
+    background: #fff;
+  }
+  .reminder-type-badge.task { color: #fff; background: var(--ink); border-color: var(--ink); }
+  .reminder-actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .reminder-actions select {
+    font-family: 'Inter', sans-serif;
+    font-size: 13px;
+    padding: 6px 8px;
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    background: #fff;
+    color: var(--ink);
+  }
+
+  .review-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(35, 36, 31, 0.55);
+    z-index: 100;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+  .review-modal {
+    background: var(--paper);
+    border-radius: 6px;
+    max-width: 480px;
+    width: 100%;
+    max-height: 85vh;
+    overflow-y: auto;
+    padding: 22px;
+    border: 1px solid var(--line);
+  }
+  .review-modal-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 2px solid var(--ink);
+    padding-bottom: 10px;
+    margin-bottom: 16px;
+    font-family: 'Fraunces', serif;
+    font-weight: 600;
+    font-size: 18px;
+  }
+  .review-progress { font-size: 12px; color: var(--ink-soft); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 8px; }
+  .review-item-text { font-size: 17px; font-family: 'Fraunces', serif; font-weight: 500; margin-bottom: 16px; }
+  .review-item-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+  .review-summary { font-size: 14px; }
+  .review-notes-input {
+    width: 100%;
+    font-family: 'Inter', sans-serif;
+    font-size: 14px;
+    padding: 10px;
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    margin-top: 10px;
+    resize: vertical;
+  }
+
+  .journal-entry { padding: 10px 0; border-bottom: 1px solid var(--line); }
+  .journal-entry:last-child { border-bottom: none; }
+  .journal-head { font-size: 12px; color: var(--ink-soft); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; }
+  .journal-notes { font-size: 14px; white-space: pre-wrap; }
+  .journal-notes.empty-note { color: var(--ink-soft); font-style: italic; }
+
+  @media (max-width: 480px) {
+    .review-item-actions button { flex: 1 1 auto; }
+  }
 </style>
 </head>
 <body>
@@ -426,6 +547,35 @@
   </div>
 
   <div class="note" id="current-place-status" style="margin:-8px 0 20px 2px;"></div>
+
+  <div class="review-banner" id="review-banner" style="display:none;">
+    <div class="review-banner-text" id="review-banner-text"></div>
+    <button class="export-btn" id="review-banner-btn">Review starten</button>
+  </div>
+
+  <details class="cat-manage" id="reminders-section" open>
+    <summary>Erinnerungen &amp; Aufgaben<span class="badge" id="reminders-count"></span></summary>
+    <div class="add-cat-form" style="margin-top:14px;">
+      <input type="text" id="reminder-text" placeholder="Gedanke oder Aufgabe notieren…">
+      <button id="reminder-add" class="export-btn">Hinzufügen</button>
+    </div>
+    <div class="reminders-list" id="reminders-list"></div>
+    <div class="review-actions" style="margin-top:16px; display:flex; gap:8px; flex-wrap:wrap;">
+      <button class="export-btn" id="review-noon-btn">☀️ Mittags-Review</button>
+      <button class="export-btn" id="review-evening-btn">🌙 Abend-Review</button>
+    </div>
+    <div class="note" id="review-status"></div>
+    <div style="margin-top:14px;">
+      <button class="export-btn" id="notify-toggle">Erinnerungs-Benachrichtigungen einschalten</button>
+      <div class="note" id="notify-status" style="margin-top:8px;"></div>
+    </div>
+    <div class="note">Benachrichtigungen funktionieren nur, solange diese Seite in einem Tab geöffnet ist.</div>
+  </details>
+
+  <details class="cat-manage" id="journal-section">
+    <summary>Journal (Review-Notizen)</summary>
+    <div id="journal-list" style="margin-top:14px;"></div>
+  </details>
 
   <div class="totals-head">
     <span style="font-size:13px; color:var(--ink-soft); text-transform:uppercase; letter-spacing:0.06em;">Summen</span>
@@ -526,6 +676,16 @@
 
 </div>
 
+<div class="review-overlay" id="review-overlay">
+  <div class="review-modal">
+    <div class="review-modal-head">
+      <span id="review-modal-title"></span>
+      <button class="export-btn" id="review-close-btn">Schließen</button>
+    </div>
+    <div id="review-modal-body"></div>
+  </div>
+</div>
+
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script>
 const CATS_KEY = 'categories';
@@ -535,6 +695,10 @@ const SYNC_NAME_KEY = 'sync-person-name';
 const SYNC_URL_KEY = 'sync-sheet-url';
 const PLACES_KEY = 'places';
 const AUTO_KEY = 'auto-tracking-enabled';
+const REMINDERS_KEY = 'reminders';
+const JOURNAL_KEY = 'journal-entries';
+const REVIEW_LOG_KEY = 'review-log';
+const NOTIFY_KEY = 'reminders-notify-enabled';
 
 const PALETTE = ['#A83A2E', '#3B6E8F', '#5B7B3F', '#8B5FA0', '#B8862E', '#4F4F4F'];
 const DEFAULT_CATS = [
@@ -551,6 +715,13 @@ let tickHandle = null;
 let places = [];
 let watchId = null;
 let insideMap = {};
+let reminders = [];
+let journal = [];
+let reviewLog = [];
+let reviewQueue = [];
+let reviewIdx = 0;
+let reviewSlotActive = null;
+let notifiedSlots = {};
 
 function fmtDate(d) {
   return d.toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' });
@@ -604,11 +775,47 @@ async function load() {
     places = v ? JSON.parse(v) : [];
   } catch (e) { places = []; }
 
+  try {
+    const v = localStorage.getItem(REMINDERS_KEY);
+    reminders = v ? JSON.parse(v) : [];
+  } catch (e) { reminders = []; }
+  try {
+    const v = localStorage.getItem(JOURNAL_KEY);
+    journal = v ? JSON.parse(v) : [];
+  } catch (e) { journal = []; }
+  try {
+    const v = localStorage.getItem(REVIEW_LOG_KEY);
+    reviewLog = v ? JSON.parse(v) : [];
+  } catch (e) { reviewLog = []; }
+
   document.getElementById('sync-name').value = localStorage.getItem(SYNC_NAME_KEY) || '';
   document.getElementById('sync-url').value = localStorage.getItem(SYNC_URL_KEY) || '';
 }
 
 async function savePlaces() { try { localStorage.setItem(PLACES_KEY, JSON.stringify(places)); } catch (e) {} }
+async function saveReminders() { try { localStorage.setItem(REMINDERS_KEY, JSON.stringify(reminders)); } catch (e) {} }
+async function saveJournal() { try { localStorage.setItem(JOURNAL_KEY, JSON.stringify(journal)); } catch (e) {} }
+async function saveReviewLog() { try { localStorage.setItem(REVIEW_LOG_KEY, JSON.stringify(reviewLog)); } catch (e) {} }
+
+function escapeHtml(s) {
+  const div = document.createElement('div');
+  div.textContent = s;
+  return div.innerHTML;
+}
+
+function todayKey() { return dateKey(new Date()); }
+
+function currentSlotWindow() {
+  const h = new Date().getHours();
+  if (h >= 11 && h < 15) return 'noon';
+  if (h >= 18 && h < 23) return 'evening';
+  return null;
+}
+
+function reviewDoneToday(slot) {
+  const k = todayKey();
+  return reviewLog.some(r => r.date === k && r.slot === slot);
+}
 
 async function saveCats() { try { localStorage.setItem(CATS_KEY, JSON.stringify(categories)); } catch (e) {} }
 async function saveSessions() { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions)); } catch (e) {} }
@@ -733,6 +940,7 @@ function render() {
   renderLog();
   renderCatManage();
   renderPlaces();
+  renderReminders();
 }
 
 function computeTotals(range) {
@@ -896,6 +1104,287 @@ function renderCatManage() {
         sw.classList.add('selected');
         swWrap.dataset.selected = sw.getAttribute('data-color');
       });
+    });
+  }
+}
+
+function reminderRowHtml(r) {
+  const isTask = r.type === 'task';
+  const catOptions = categories.map(c => '<option value="' + c.id + '"' + (r.categoryId === c.id ? ' selected' : '') + '>' + c.name + '</option>').join('');
+  return '<div class="reminder-row" data-id="' + r.id + '">'
+    + '<div class="reminder-main">'
+    + '<span class="reminder-type-badge' + (isTask ? ' task' : '') + '" data-action="toggle-type" data-id="' + r.id + '">' + (isTask ? 'Aufgabe' : 'Gedanke') + '</span>'
+    + '<span class="reminder-text">' + escapeHtml(r.text) + '</span>'
+    + '</div>'
+    + '<div class="reminder-actions">'
+    + (isTask
+        ? '<select class="reminder-cat" data-id="' + r.id + '"><option value="">Kategorie…</option>' + catOptions + '</select>'
+          + '<button class="edit" data-action="start" data-id="' + r.id + '" aria-label="Zeit starten">▶</button>'
+        : '')
+    + '<button class="edit" data-action="done" data-id="' + r.id + '" aria-label="Erledigt">✓</button>'
+    + '<button class="del" data-action="delete" data-id="' + r.id + '" aria-label="Löschen">✕</button>'
+    + '</div>'
+    + '</div>';
+}
+
+async function completeReminder(id, opts) {
+  const r = reminders.find(x => x.id === id);
+  if (!r) return;
+  r.status = 'done';
+  r.completedAt = Date.now();
+  await saveReminders();
+  if (!(opts && opts.silent)) renderReminders();
+}
+
+async function startReminderAsTracking(id) {
+  const r = reminders.find(x => x.id === id);
+  if (!r) return;
+  if (!r.categoryId) { alert('Bitte zuerst eine Kategorie wählen.'); return; }
+  if (active) await stopActive();
+  selectedCat = r.categoryId;
+  active = { start: Date.now(), categoryId: r.categoryId };
+  await saveActive();
+  if (tickHandle) clearInterval(tickHandle);
+  tickHandle = setInterval(tick, 1000);
+  tick();
+  await completeReminder(id, { silent: true });
+  render();
+}
+
+function attachReminderHandlers(container) {
+  container.querySelectorAll('[data-action="toggle-type"]').forEach(el => {
+    el.addEventListener('click', async () => {
+      const r = reminders.find(x => x.id === el.getAttribute('data-id'));
+      if (!r) return;
+      r.type = r.type === 'task' ? 'thought' : 'task';
+      await saveReminders();
+      renderReminders();
+    });
+  });
+  container.querySelectorAll('[data-action="done"]').forEach(el => {
+    el.addEventListener('click', () => completeReminder(el.getAttribute('data-id')).then(renderReminders));
+  });
+  container.querySelectorAll('[data-action="delete"]').forEach(el => {
+    el.addEventListener('click', async () => {
+      reminders = reminders.filter(r => r.id !== el.getAttribute('data-id'));
+      await saveReminders();
+      renderReminders();
+    });
+  });
+  container.querySelectorAll('.reminder-cat').forEach(sel => {
+    sel.addEventListener('change', async () => {
+      const r = reminders.find(x => x.id === sel.getAttribute('data-id'));
+      if (r) { r.categoryId = sel.value || null; await saveReminders(); }
+    });
+  });
+  container.querySelectorAll('[data-action="start"]').forEach(el => {
+    el.addEventListener('click', () => startReminderAsTracking(el.getAttribute('data-id')));
+  });
+}
+
+function renderReminders() {
+  const list = document.getElementById('reminders-list');
+  if (!list) return;
+  const open = reminders.filter(r => r.status === 'open');
+  const countBadge = document.getElementById('reminders-count');
+  if (countBadge) countBadge.textContent = open.length > 0 ? open.length : '';
+
+  if (open.length === 0) {
+    list.innerHTML = '<div class="empty">Keine offenen Erinnerungen. Trag einen Gedanken oder eine Aufgabe ein.</div>';
+  } else {
+    const sorted = [...open].sort((a, b) => b.created - a.created);
+    list.innerHTML = sorted.map(reminderRowHtml).join('');
+    attachReminderHandlers(list);
+  }
+
+  const statusEl = document.getElementById('review-status');
+  if (statusEl) {
+    const noonDone = reviewDoneToday('noon');
+    const eveningDone = reviewDoneToday('evening');
+    statusEl.textContent = 'Heute: Mittags-Review ' + (noonDone ? '✓ erledigt' : 'offen') + ' · Abend-Review ' + (eveningDone ? '✓ erledigt' : 'offen');
+  }
+
+  updateReviewBanner();
+  renderJournal();
+  updateNotifyStatus();
+}
+
+function updateReviewBanner() {
+  const banner = document.getElementById('review-banner');
+  const textEl = document.getElementById('review-banner-text');
+  const btn = document.getElementById('review-banner-btn');
+  if (!banner) return;
+  const slot = currentSlotWindow();
+  const open = reminders.filter(r => r.status === 'open').length;
+  if (slot && !reviewDoneToday(slot)) {
+    banner.style.display = 'flex';
+    const label = slot === 'noon' ? 'Mittags-Review' : 'Abend-Review';
+    textEl.textContent = (slot === 'noon' ? '☀️ ' : '🌙 ') + label + ' steht an' + (open > 0 ? ' — ' + open + ' offene Erinnerung' + (open === 1 ? '' : 'en') : '') + '.';
+    btn.onclick = () => startReview(slot);
+  } else {
+    banner.style.display = 'none';
+  }
+}
+
+function renderJournal() {
+  const list = document.getElementById('journal-list');
+  if (!list) return;
+  if (journal.length === 0) {
+    list.innerHTML = '<div class="empty">Noch keine Review-Notizen.</div>';
+    return;
+  }
+  const sorted = [...journal].sort((a, b) => b.createdAt - a.createdAt).slice(0, 30);
+  list.innerHTML = sorted.map(j => {
+    const label = j.slot === 'noon' ? '☀️ Mittag' : '🌙 Abend';
+    const d = new Date(j.date + 'T00:00:00');
+    return '<div class="journal-entry"><div class="journal-head">' + fmtDate(d) + ' · ' + label + '</div>'
+      + (j.notes ? '<div class="journal-notes">' + escapeHtml(j.notes) + '</div>' : '<div class="journal-notes empty-note">(keine Notizen)</div>')
+      + '</div>';
+  }).join('');
+}
+
+document.getElementById('reminder-add').addEventListener('click', addReminder);
+document.getElementById('reminder-text').addEventListener('keydown', e => { if (e.key === 'Enter') addReminder(); });
+
+async function addReminder() {
+  const input = document.getElementById('reminder-text');
+  const text = input.value.trim();
+  if (!text) return;
+  reminders.push({ id: 'r' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), text, type: 'thought', status: 'open', categoryId: null, created: Date.now() });
+  await saveReminders();
+  input.value = '';
+  renderReminders();
+}
+
+function startReview(slot) {
+  reviewSlotActive = slot;
+  reviewQueue = reminders.filter(r => r.status === 'open').sort((a, b) => a.created - b.created);
+  reviewIdx = 0;
+  document.getElementById('review-modal-title').textContent = slot === 'noon' ? '☀️ Mittags-Review' : '🌙 Abend-Review';
+  document.getElementById('review-overlay').style.display = 'flex';
+  renderReviewStep();
+}
+
+function nextReviewStep() {
+  reviewIdx++;
+  renderReviewStep();
+}
+
+function reviewSummaryHtml() {
+  return '<div class="review-summary">Review abgeschlossen. Magst du deine Gedanken noch strukturieren?</div>'
+    + '<textarea id="review-notes" class="review-notes-input" rows="4" placeholder="Notizen zu diesem Review (optional)…"></textarea>'
+    + '<div style="margin-top:14px; display:flex; gap:8px;"><button class="export-btn" id="review-save-btn">Review abschließen</button></div>';
+}
+
+function renderReviewStep() {
+  const body = document.getElementById('review-modal-body');
+  if (reviewIdx >= reviewQueue.length) {
+    body.innerHTML = reviewSummaryHtml();
+    document.getElementById('review-save-btn').addEventListener('click', async () => {
+      const notes = document.getElementById('review-notes').value.trim();
+      journal.push({ id: 'j' + Date.now().toString(36), date: todayKey(), slot: reviewSlotActive, notes, createdAt: Date.now() });
+      await saveJournal();
+      reviewLog = reviewLog.filter(r => !(r.date === todayKey() && r.slot === reviewSlotActive));
+      reviewLog.push({ date: todayKey(), slot: reviewSlotActive });
+      await saveReviewLog();
+      closeReview();
+      render();
+    });
+    return;
+  }
+
+  const r = reviewQueue[reviewIdx];
+  const catOptions = categories.map(c => '<option value="' + c.id + '"' + (r.categoryId === c.id ? ' selected' : '') + '>' + c.name + '</option>').join('');
+  body.innerHTML =
+    '<div class="review-progress">' + (reviewIdx + 1) + ' / ' + reviewQueue.length + '</div>'
+    + '<div class="review-item-text">' + escapeHtml(r.text) + '</div>'
+    + '<div class="review-item-actions">'
+    + '<button class="export-btn" data-act="done">✓ Erledigt</button>'
+    + '<button class="export-btn" data-act="task">📌 Zur Aufgabe machen</button>'
+    + '<button class="export-btn" data-act="skip">⏭ Später</button>'
+    + '<button class="export-btn" data-act="delete">✕ Löschen</button>'
+    + '</div>'
+    + (r.type === 'task'
+        ? '<div class="manual-form" style="margin-top:14px;"><label>Kategorie<select id="review-cat"><option value="">–</option>' + catOptions + '</select></label><button class="export-btn" id="review-start-btn">▶ Jetzt starten</button></div>'
+        : '');
+
+  body.querySelector('[data-act="done"]').addEventListener('click', async () => { await completeReminder(r.id, { silent: true }); nextReviewStep(); });
+  body.querySelector('[data-act="task"]').addEventListener('click', async () => { r.type = 'task'; await saveReminders(); renderReviewStep(); });
+  body.querySelector('[data-act="skip"]').addEventListener('click', () => nextReviewStep());
+  body.querySelector('[data-act="delete"]').addEventListener('click', async () => { reminders = reminders.filter(x => x.id !== r.id); await saveReminders(); nextReviewStep(); });
+
+  const startBtn = body.querySelector('#review-start-btn');
+  if (startBtn) {
+    startBtn.addEventListener('click', async () => {
+      const catSel = document.getElementById('review-cat');
+      const catId = catSel.value;
+      if (!catId) { alert('Bitte Kategorie wählen.'); return; }
+      r.categoryId = catId;
+      await saveReminders();
+      if (active) await stopActive();
+      selectedCat = catId;
+      active = { start: Date.now(), categoryId: catId };
+      await saveActive();
+      if (tickHandle) clearInterval(tickHandle);
+      tickHandle = setInterval(tick, 1000);
+      tick();
+      await completeReminder(r.id, { silent: true });
+      closeReview();
+      render();
+    });
+  }
+}
+
+function closeReview() {
+  document.getElementById('review-overlay').style.display = 'none';
+  reviewQueue = [];
+  reviewIdx = 0;
+  reviewSlotActive = null;
+}
+
+document.getElementById('review-close-btn').addEventListener('click', closeReview);
+document.getElementById('review-overlay').addEventListener('click', (e) => {
+  if (e.target.id === 'review-overlay') closeReview();
+});
+document.getElementById('review-noon-btn').addEventListener('click', () => startReview('noon'));
+document.getElementById('review-evening-btn').addEventListener('click', () => startReview('evening'));
+
+function updateNotifyStatus() {
+  const btn = document.getElementById('notify-toggle');
+  const statusEl = document.getElementById('notify-status');
+  if (!btn) return;
+  const on = localStorage.getItem(NOTIFY_KEY) === '1';
+  btn.textContent = on ? 'Erinnerungs-Benachrichtigungen ausschalten' : 'Erinnerungs-Benachrichtigungen einschalten';
+  btn.classList.toggle('running', on);
+  if (statusEl) statusEl.textContent = on ? 'Aktiv, solange diese Seite geöffnet ist.' : 'Aus.';
+}
+
+document.getElementById('notify-toggle').addEventListener('click', async () => {
+  if (localStorage.getItem(NOTIFY_KEY) === '1') {
+    localStorage.setItem(NOTIFY_KEY, '0');
+    updateNotifyStatus();
+    return;
+  }
+  if (!('Notification' in window)) { alert('Benachrichtigungen werden von diesem Browser nicht unterstützt.'); return; }
+  const perm = await Notification.requestPermission();
+  if (perm === 'granted') {
+    localStorage.setItem(NOTIFY_KEY, '1');
+  } else {
+    alert('Ohne Erlaubnis können keine Benachrichtigungen gesendet werden.');
+  }
+  updateNotifyStatus();
+});
+
+function checkNotifyTimer() {
+  if (localStorage.getItem(NOTIFY_KEY) !== '1') return;
+  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+  const slot = currentSlotWindow();
+  const key = todayKey() + '-' + slot;
+  if (slot && !reviewDoneToday(slot) && !notifiedSlots[key]) {
+    notifiedSlots[key] = true;
+    new Notification('Zeit für dein ' + (slot === 'noon' ? 'Mittags' : 'Abend') + '-Review', {
+      body: 'Geh deine Erinnerungen durch und strukturiere deine Aufgaben.',
+      tag: 'review-' + slot
     });
   }
 }
@@ -1262,6 +1751,8 @@ document.getElementById('place-add').addEventListener('click', async () => {
   if (localStorage.getItem(AUTO_KEY) === '1' && places.length > 0) {
     startLocationWatch();
   }
+  checkNotifyTimer();
+  setInterval(checkNotifyTimer, 60000);
 })();
 </script>
 </body>
