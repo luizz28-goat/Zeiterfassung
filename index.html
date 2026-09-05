@@ -583,6 +583,12 @@ function startOfMonth(d) {
   return new Date(d.getFullYear(), d.getMonth(), 1, 0, 0, 0, 0);
 }
 function catById(id) { return categories.find(c => c.id === id); }
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+function catOptionsHtml() {
+  return categories.map(c => '<option value="' + c.id + '">' + escapeHtml(c.name) + '</option>').join('');
+}
 
 async function load() {
   try {
@@ -681,7 +687,7 @@ function renderCats() {
   categories.forEach(c => {
     const isSel = c.id === selectedCat;
     html += '<div class="cat-chip' + (isSel ? ' selected' : '') + '" style="--cat-color:' + c.color + '" data-id="' + c.id + '">';
-    html += '<span class="dot" style="background:' + c.color + '"></span>' + c.name;
+    html += '<span class="dot" style="background:' + c.color + '"></span>' + escapeHtml(c.name);
     html += '</div>';
   });
   wrap.innerHTML = html;
@@ -695,9 +701,9 @@ function renderCats() {
   document.getElementById('toggle-btn').style.setProperty('--cat-color', cur ? cur.color : '#23241F');
 
   const mCat = document.getElementById('m-cat');
-  mCat.innerHTML = categories.map(c => '<option value="' + c.id + '">' + c.name + '</option>').join('');
+  mCat.innerHTML = catOptionsHtml();
   const placeCat = document.getElementById('place-cat');
-  if (placeCat) placeCat.innerHTML = categories.map(c => '<option value="' + c.id + '">' + c.name + '</option>').join('');
+  if (placeCat) placeCat.innerHTML = catOptionsHtml();
 }
 
 async function selectCategory(id) {
@@ -769,7 +775,7 @@ function renderTotals() {
   shown.forEach(c => {
     const val = byCat[c.id] || 0;
     grand += val;
-    html += '<div class="totals-row"><span class="name"><span class="dot" style="background:' + c.color + '"></span>' + c.name + '</span><span class="val">' + fmtDur(val) + '</span></div>';
+    html += '<div class="totals-row"><span class="name"><span class="dot" style="background:' + c.color + '"></span>' + escapeHtml(c.name) + '</span><span class="val">' + fmtDur(val) + '</span></div>';
   });
   if (shown.length > 1) {
     html += '<div class="totals-row grand"><span class="name">Gesamt</span><span class="val">' + fmtDur(grand) + '</span></div>';
@@ -831,7 +837,7 @@ function renderLog() {
         const name = cat ? cat.name : 'Gelöscht';
         html += '<div class="entry">';
         html += '<span class="dot" style="background:' + color + '"></span>';
-        html += '<div class="times">' + name + ' · ' + fmtTime(new Date(s.start)) + '–' + fmtTime(new Date(s.end)) + '</div>';
+        html += '<div class="times">' + escapeHtml(name) + ' · ' + fmtTime(new Date(s.start)) + '–' + fmtTime(new Date(s.end)) + '</div>';
         html += '<div class="dur">' + fmtDur(s.duration) + '</div>';
         html += '<button class="edit" data-id="' + s.id + '" aria-label="Eintrag bearbeiten">✎</button>';
         html += '<button class="del" data-id="' + s.id + '" aria-label="Eintrag löschen">✕</button>';
@@ -870,7 +876,7 @@ function renderLog() {
 function renderCatManage() {
   const list = document.getElementById('cat-manage-list');
   list.innerHTML = categories.map(c =>
-    '<div class="cat-manage-row"><span class="dot" style="background:' + c.color + '"></span><span class="name">' + c.name + '</span><button data-id="' + c.id + '">Entfernen</button></div>'
+    '<div class="cat-manage-row"><span class="dot" style="background:' + c.color + '"></span><span class="name">' + escapeHtml(c.name) + '</span><button data-id="' + c.id + '">Entfernen</button></div>'
   ).join('');
   list.querySelectorAll('button').forEach(b => {
     b.addEventListener('click', async () => {
@@ -1123,7 +1129,7 @@ function renderPlaces() {
   } else {
     list.innerHTML = places.map(p => {
       const cat = catById(p.categoryId);
-      return '<div class="cat-manage-row"><span class="dot" style="background:' + (cat ? cat.color : '#999') + '"></span><span class="name">' + p.name + ' · ' + (cat ? cat.name : '–') + ' · ' + p.radius + ' m</span><button data-id="' + p.id + '">Entfernen</button></div>';
+      return '<div class="cat-manage-row"><span class="dot" style="background:' + (cat ? cat.color : '#999') + '"></span><span class="name">' + escapeHtml(p.name) + ' · ' + escapeHtml(cat ? cat.name : '–') + ' · ' + p.radius + ' m</span><button data-id="' + p.id + '">Entfernen</button></div>';
     }).join('');
     list.querySelectorAll('button').forEach(b => {
       b.addEventListener('click', async () => {
