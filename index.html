@@ -404,6 +404,43 @@
     cursor: pointer;
   }
   .export-btn:active { transform: scale(0.97); }
+
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+  .stat-tile {
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: 12px 14px;
+  }
+  .stat-tile .label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--ink-soft);
+    margin-bottom: 4px;
+  }
+  .stat-tile .value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 18px;
+    font-weight: 600;
+  }
+  .stat-tile .sub {
+    font-size: 11px;
+    color: var(--ink-soft);
+    margin-top: 2px;
+  }
+  .stats-subheading {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--ink-soft);
+    margin: 18px 0 8px;
+  }
 </style>
 </head>
 <body>
@@ -507,6 +544,11 @@
       <button id="place-add" class="export-btn">Ort speichern</button>
     </div>
     <div class="note">Tipp: Stelle dich an den gewünschten Ort und tippe auf „Aktuellen Standort verwenden", statt Koordinaten selbst zu suchen.</div>
+  </details>
+
+  <details class="cat-manage">
+    <summary>Statistiken</summary>
+    <div id="stats-content" style="margin-top:14px;"></div>
   </details>
 
   <details class="cat-manage">
@@ -737,8 +779,76 @@ function render() {
 
   renderTotals();
   renderLog();
+  renderStats();
   renderCatManage();
   renderPlaces();
+}
+
+const WEEKDAY_NAMES = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'];
+
+function computeStreak(dayKeys) {
+  if (dayKeys.size === 0) return 0;
+  let streak = 0;
+  const cursor = new Date();
+  cursor.setHours(0, 0, 0, 0);
+  if (!dayKeys.has(dateKey(cursor))) {
+    cursor.setDate(cursor.getDate() - 1);
+    if (!dayKeys.has(dateKey(cursor))) return 0;
+  }
+  while (dayKeys.has(dateKey(cursor))) {
+    streak++;
+    cursor.setDate(cursor.getDate() - 1);
+  }
+  return streak;
+}
+
+function renderStats() {
+  const el = document.getElementById('stats-content');
+  if (!el) return;
+
+  if (sessions.length === 0) {
+    el.innerHTML = '<div class="empty">Noch keine Daten für Statistiken.</div>';
+    return;
+  }
+
+  let total = 0;
+  const dayKeys = new Set();
+  const byWeekday = [0, 0, 0, 0, 0, 0, 0];
+  let longest = sessions[0];
+
+  sessions.forEach(s => {
+    total += s.duration;
+    dayKeys.add(dateKey(new Date(s.start)));
+    const wd = (new Date(s.start).getDay() + 6) % 7;
+    byWeekday[wd] += s.duration;
+    if (s.duration > longest.duration) longest = s;
+  });
+
+  const dayCount = dayKeys.size;
+  const avgPerDay = dayCount > 0 ? total / dayCount : 0;
+  const streak = computeStreak(dayKeys);
+  const longestCat = catById(longest.categoryId);
+
+  let html = '<div class="stats-grid">';
+  html += '<div class="stat-tile"><div class="label">Gesamtzeit</div><div class="value">' + fmtDur(total) + '</div><div class="sub">seit erstem Eintrag</div></div>';
+  html += '<div class="stat-tile"><div class="label">Tage mit Einträgen</div><div class="value">' + dayCount + '</div></div>';
+  html += '<div class="stat-tile"><div class="label">Ø pro Tag</div><div class="value">' + fmtDur(avgPerDay) + '</div><div class="sub">an Tagen mit Eintrag</div></div>';
+  html += '<div class="stat-tile"><div class="label">Aktuelle Serie</div><div class="value">' + streak + (streak === 1 ? ' Tag' : ' Tage') + '</div></div>';
+  html += '</div>';
+
+  html += '<div class="stat-tile" style="margin-bottom:14px;"><div class="label">Längste Sitzung</div><div class="value">' + fmtDur(longest.duration) + '</div><div class="sub">' + escapeHtml(longestCat ? longestCat.name : 'Gelöscht') + ' · ' + fmtDate(new Date(longest.start)) + '</div></div>';
+
+  html += '<div class="stats-subheading">Verteilung nach Wochentag</div>';
+  html += '<div class="totals-table">';
+  const maxWeekday = Math.max(...byWeekday, 1);
+  WEEKDAY_NAMES.forEach((name, i) => {
+    const val = byWeekday[i];
+    const pct = Math.round((val / maxWeekday) * 100);
+    html += '<div class="totals-row"><span class="name">' + name + '</span><span class="val" style="background:linear-gradient(90deg, var(--line) ' + pct + '%, transparent ' + pct + '%); padding:2px 6px; border-radius:2px;">' + fmtDur(val) + '</span></div>';
+  });
+  html += '</div>';
+
+  el.innerHTML = html;
 }
 
 function computeTotals(range) {
