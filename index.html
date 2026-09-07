@@ -814,6 +814,7 @@ function renderStats() {
   let total = 0;
   const dayKeys = new Set();
   const byWeekday = [0, 0, 0, 0, 0, 0, 0];
+  const byCategory = {};
   let longest = sessions[0];
 
   sessions.forEach(s => {
@@ -821,6 +822,7 @@ function renderStats() {
     dayKeys.add(dateKey(new Date(s.start)));
     const wd = (new Date(s.start).getDay() + 6) % 7;
     byWeekday[wd] += s.duration;
+    byCategory[s.categoryId] = (byCategory[s.categoryId] || 0) + s.duration;
     if (s.duration > longest.duration) longest = s;
   });
 
@@ -845,6 +847,17 @@ function renderStats() {
     const val = byWeekday[i];
     const pct = Math.round((val / maxWeekday) * 100);
     html += '<div class="totals-row"><span class="name">' + name + '</span><span class="val" style="background:linear-gradient(90deg, var(--line) ' + pct + '%, transparent ' + pct + '%); padding:2px 6px; border-radius:2px;">' + fmtDur(val) + '</span></div>';
+  });
+  html += '</div>';
+
+  html += '<div class="stats-subheading">Verteilung nach Kategorie</div>';
+  html += '<div class="totals-table">';
+  const catIds = Object.keys(byCategory).sort((a, b) => byCategory[b] - byCategory[a]);
+  catIds.forEach(cid => {
+    const cat = catById(cid);
+    const color = cat ? cat.color : '#999';
+    const name = cat ? cat.name : 'Gelöscht';
+    html += '<div class="totals-row"><span class="name"><span class="dot" style="background:' + color + '"></span>' + escapeHtml(name) + '</span><span class="val">' + fmtDur(byCategory[cid]) + '</span></div>';
   });
   html += '</div>';
 
@@ -1024,7 +1037,8 @@ function tick() {
 
 async function stopActive() {
   if (!active) return;
-  const end = Date.now();
+  let end = Date.now();
+  if (end < active.start) end = active.start; // guard against the device clock moving backward mid-session
   const session = { id: active.start, categoryId: active.categoryId, start: active.start, end: end, duration: end - active.start };
   sessions.push(session);
   active = null;
