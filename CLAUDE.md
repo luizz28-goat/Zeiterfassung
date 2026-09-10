@@ -23,3 +23,17 @@ Zeitkonto-App: Start/Stop-Zeiterfassung mit Kategorien. Einzelne `index.html`
   (squash), dann `unsubscribe_pr_activity`.
 - Kein separates Test-Setup — Änderungen mit Playwright (headless Chromium,
   `executablePath: '/opt/pw-browsers/chromium'`) gegen `index.html` smoke-testen.
+
+## Zusammenspiel mit claude.ai-Projects (Chat/Cowork)
+
+Dieses Repo ist im claude.ai-Project "Kleine Anwendungen" als Kontext verknüpft.
+Das Project liest dadurch automatisch den aktuellen Repo-Stand (Commits, Dateien,
+auch diese Datei) — es gibt aber keinen Weg zurück: was im Project-Chat besprochen
+wird, landet nicht automatisch hier.
+
+Deshalb: tatsächliche Arbeitsanweisungen ("bau X", "ändere Y") nur hier im
+Code-Bereich geben, nicht parallel im Project-Chat, damit nicht zwei Stellen
+unabhängig voneinander am selben Code arbeiten. Wurde im Project-Chat trotzdem
+etwas entschieden, das den Code betreffen soll, wird es zuerst hier (in dieser
+Datei oder direkt in der nächsten Anweisung) festgehalten, bevor daran
+gearbeitet wird.
