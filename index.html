@@ -38,7 +38,7 @@
     .clock-card { flex-direction: column; align-items: stretch; gap: 18px; padding: 22px 18px; }
     .clock-display { font-size: 32px; }
     button.stamp { width: 100%; padding: 16px; }
-    .entry { grid-template-columns: 1fr auto auto auto; font-size: 13px; }
+    .entry { grid-template-columns: auto 1fr auto auto auto; gap: 6px; font-size: 13px; }
     .manual-form { flex-direction: column; align-items: stretch; }
     .manual-form label, .manual-form input, .manual-form select, .manual-form button { width: 100%; }
     .export-btn { width: 100%; }
@@ -613,7 +613,10 @@ function fmtDurLong(ms) {
   const sec = String(s % 60).padStart(2, '0');
   return h + ':' + m + ':' + sec;
 }
-function dateKey(d) { return d.toISOString().slice(0, 10); }
+function dateKey(d) {
+  // lokales Datum statt UTC, sonst landen Einträge zwischen 0 und 2 Uhr am Vortag
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
 function startOfWeek(d) {
   const day = (d.getDay() + 6) % 7;
   const res = new Date(d);
@@ -678,7 +681,7 @@ function sendToSheet(session) {
     person: name,
     kategorie: cat ? cat.name : 'Gelöscht',
     datum: sd.toLocaleDateString('de-DE'),
-    datumISO: sd.toISOString().slice(0, 10),
+    datumISO: dateKey(sd),
     start: fmtTime(sd),
     ende: fmtTime(ed),
     dauerStunden: Math.round((session.duration / 3600000) * 100) / 100,
@@ -953,7 +956,7 @@ function renderLog() {
       const entries = groups[k];
       const dayTotal = entries.reduce((sum, s) => sum + s.duration, 0);
       html += '<div class="day-group">';
-      html += '<div class="day-head"><span>' + fmtDate(new Date(k)) + '</span><span class="day-total">' + fmtDur(dayTotal) + '</span></div>';
+      html += '<div class="day-head"><span>' + fmtDate(new Date(k + 'T00:00:00')) + '</span><span class="day-total">' + fmtDur(dayTotal) + '</span></div>';
       entries.forEach(s => {
         const cat = catById(s.categoryId);
         const color = cat ? cat.color : '#999';
@@ -1226,7 +1229,7 @@ document.getElementById('export-btn').addEventListener('click', () => {
     XLSX.utils.book_append_sheet(wb, ws, sheetName);
   });
 
-  const filename = 'Zeitkonto_' + new Date().toISOString().slice(0, 10) + '.xlsx';
+  const filename = 'Zeitkonto_' + dateKey(new Date()) + '.xlsx';
 
   try {
     const wbArray = XLSX.write(wb, { type: 'array', bookType: 'xlsx' });
@@ -1285,6 +1288,7 @@ function distanceMeters(lat1, lon1, lat2, lon2) {
 }
 
 async function handleEnterPlace(place) {
+  if (!catById(place.categoryId)) return; // Kategorie des Orts wurde gelöscht
   if (active && active.categoryId === place.categoryId) return;
   if (active) await stopActive();
   selectedCat = place.categoryId;
