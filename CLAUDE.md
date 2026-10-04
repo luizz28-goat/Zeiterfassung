@@ -24,6 +24,15 @@ Zeitkonto-App: Start/Stop-Zeiterfassung mit Kategorien. Einzelne `index.html`
 - Kein separates Test-Setup — Änderungen mit Playwright (headless Chromium,
   `executablePath: '/opt/pw-browsers/chromium'`) gegen `index.html` smoke-testen.
 
+## Hindsight (Langzeitgedächtnis)
+
+- `.claude/settings.json` (Hooks) und `.mcp.json` binden Hindsight Cloud über
+  `.claude/hooks/hindsight.sh` ein (Paket `@vectorize-io/hindsight-coding-agents`,
+  gepinnt auf 0.8.0, wird pro Container in `~/.cache` installiert).
+- Aktiv nur, wenn `HINDSIGHT_API_TOKEN` in der Umgebung gesetzt ist; sonst
+  tun die Hooks nichts. Memory-Bank: `coding-agent::Zeiterfassung`.
+- Mit Token gehen Prompts und Sitzungsverläufe an Vectorize (Hindsight Cloud).
+
 ## Zusammenspiel mit claude.ai-Projects (Chat/Cowork)
 
 Dieses Repo ist im claude.ai-Project "Kleine Anwendungen" als Kontext verknüpft.
