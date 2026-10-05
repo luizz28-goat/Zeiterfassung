@@ -46,3 +46,29 @@ unabhängig voneinander am selben Code arbeiten. Wurde im Project-Chat trotzdem
 etwas entschieden, das den Code betreffen soll, wird es zuerst hier (in dieser
 Datei oder direkt in der nächsten Anweisung) festgehalten, bevor daran
 gearbeitet wird.
+
+## Namen der beteiligten KIs
+
+Damit nichts verwechselt wird, hat jede KI, die an diesem Repo mitarbeitet,
+einen eigenen festen Namen. Der Name hängt daran, *wo* die KI läuft — so weiß
+jede Instanz beim Lesen dieser Datei, wie sie heißt.
+
+| Name | Wer / wo |
+|------|----------|
+| **Zeno** | Claude Code im Code-Bereich (Sessions auf diesem Repo, lokal oder in der Cloud) |
+| **Pia**  | claude.ai-Project "Kleine Anwendungen" (Project-Chat) |
+| **Cora** | Claude Cowork |
+
+Regeln:
+
+- Jede KI kennt ihren Namen, nennt sich selbst so und wird von Luiz nur mit
+  diesem Namen angesprochen.
+- Eine KI reagiert nur auf Nachrichten, die an ihren eigenen Namen gehen.
+  Ist eine Nachricht an einen anderen Namen adressiert (z. B. "Pia, …" in
+  einer Zeno-Session), führt sie nichts davon aus, sondern antwortet nur kurz,
+  dass die Nachricht an jemand anderen gerichtet ist. Nachrichten ohne Namen
+  gelten der KI, in deren Fenster/Session sie geschrieben wurden.
+- Kommt eine neue KI hinzu (weiterer Chat, zusätzliche parallele Session,
+  Subagent, anderes Tool), bekommt sie einen neuen, noch nicht vergebenen
+  Namen. Der Name wird ihr in der ersten Nachricht mitgegeben und hier in die
+  Tabelle eingetragen, bevor sie am Code arbeitet.
