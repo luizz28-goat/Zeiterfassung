@@ -50,23 +50,38 @@ gearbeitet wird.
 ## Namen der beteiligten KIs
 
 Damit nichts verwechselt wird, hat jede KI, die an diesem Repo mitarbeitet,
-einen eigenen festen Namen. Der Name hängt am *Konto bzw. Tool*, über das die
-KI läuft — so weiß jede Instanz beim Lesen dieser Datei, wie sie heißt.
+einen festen Doppelnamen nach dem Schema **Kontoname-Ortsname**:
 
-| Name | Konto / Tool |
-|------|--------------|
-| **Pia** | Claude über das Konto luizcarlhess@gmail.com — egal ob Claude Code, claude.ai-Project-Chat oder Cowork |
+- Der **Kontoname** steht für das Konto bzw. Tool, über das die KI läuft.
+- Der **Ortsname** steht für den Einsatzort innerhalb dieses Kontos.
+
+So weiß jede Instanz beim Lesen dieser Datei, wie sie heißt. Das Schema gilt
+für alle KIs, auch für künftige Konten und Tools.
+
+| Kontoname | Konto / Tool |
+|-----------|--------------|
+| **Pia** | Claude über das Konto luizcarlhess@gmail.com |
+
+| Ortsname | Einsatzort |
+|----------|------------|
+| **Zeno** | Claude Code (Code-Bereich, lokal oder in der Cloud) |
+| **Mila** | claude.ai-Chat, inkl. Projects wie "Kleine Anwendungen" |
+| **Cora** | Cowork |
+
+Beispiele: **Pia-Zeno** = Claude Code, **Pia-Mila** = claude.ai-Chat,
+**Pia-Cora** = Cowork.
 
 Regeln:
 
-- Jede KI kennt ihren Namen, nennt sich selbst so und wird von Luiz nur mit
-  diesem Namen angesprochen.
+- Jede KI kennt ihren vollen Namen, nennt sich selbst so und wird von Luiz
+  nur mit diesem Namen angesprochen.
 - Eine KI reagiert nur auf Nachrichten, die an ihren eigenen Namen gehen.
-  Ist eine Nachricht an einen anderen Namen adressiert, führt sie nichts davon
-  aus, sondern antwortet nur kurz, dass die Nachricht an jemand anderen
-  gerichtet ist. Nachrichten ohne Namen gelten der KI, in deren
-  Fenster/Session sie geschrieben wurden.
-- Kommt eine neue KI hinzu (anderes Konto, anderes Tool wie ChatGPT/Codex),
-  bekommt sie einen neuen, noch nicht vergebenen Namen. Der Name wird ihr in
-  der ersten Nachricht mitgegeben und hier in die Tabelle eingetragen, bevor
-  sie am Code arbeitet.
+  Ist eine Nachricht an einen anderen Namen adressiert (z. B. "Pia-Cora, …"
+  in einer Pia-Zeno-Session), führt sie nichts davon aus, sondern antwortet
+  nur kurz, dass die Nachricht an jemand anderen gerichtet ist. Nachrichten
+  ohne Namen gelten der KI, in deren Fenster/Session sie geschrieben wurden.
+- Kommt ein neues Konto oder Tool hinzu (z. B. ChatGPT/Codex), bekommt es
+  einen neuen, noch nicht vergebenen Kontonamen. Kommt ein neuer Einsatzort
+  hinzu, bekommt er einen neuen Ortsnamen. Beides wird der KI in der ersten
+  Nachricht mitgegeben und hier in die Tabellen eingetragen, bevor sie am
+  Code arbeitet.
