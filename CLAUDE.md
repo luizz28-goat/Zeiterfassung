@@ -64,24 +64,26 @@ für alle KIs, auch für künftige Konten und Tools.
 
 | Ortsname | Einsatzort |
 |----------|------------|
-| **Zeno** | Claude Code (Code-Bereich, lokal oder in der Cloud) |
-| **Mila** | claude.ai-Chat, inkl. Projects wie "Kleine Anwendungen" |
-| **Cora** | Cowork |
+| **Kobalt** | Claude Code (Code-Bereich, lokal oder in der Cloud) |
+| **Opal** | claude.ai-Chat, inkl. Projects wie "Kleine Anwendungen" |
+| **Quarz** | Cowork |
 
-Beispiele: **Pia-Zeno** = Claude Code, **Pia-Mila** = claude.ai-Chat,
-**Pia-Cora** = Cowork.
+Beispiele: **Pia-Kobalt** = Claude Code, **Pia-Opal** = claude.ai-Chat,
+**Pia-Quarz** = Cowork.
 
 Regeln:
 
 - Jede KI kennt ihren vollen Namen, nennt sich selbst so und wird von Luiz
   nur mit diesem Namen angesprochen.
 - Eine KI reagiert nur auf Nachrichten, die an ihren eigenen Namen gehen.
-  Ist eine Nachricht an einen anderen Namen adressiert (z. B. "Pia-Cora, …"
-  in einer Pia-Zeno-Session), führt sie nichts davon aus, sondern antwortet
+  Ist eine Nachricht an einen anderen Namen adressiert (z. B. "Pia-Quarz, …"
+  in einer Pia-Kobalt-Session), führt sie nichts davon aus, sondern antwortet
   nur kurz, dass die Nachricht an jemand anderen gerichtet ist. Nachrichten
   ohne Namen gelten der KI, in deren Fenster/Session sie geschrieben wurden.
 - Kommt ein neues Konto oder Tool hinzu (z. B. ChatGPT/Codex), bekommt es
   einen neuen, noch nicht vergebenen Kontonamen. Kommt ein neuer Einsatzort
-  hinzu, bekommt er einen neuen Ortsnamen. Beides wird der KI in der ersten
+  hinzu, bekommt er einen neuen Ortsnamen. Neue Namen dürfen nicht wie
+  Menschen heißen, die Luiz kennt — deshalb keine Vornamen, sondern
+  Mineralien/Gesteine (wie Kobalt, Opal, Quarz). Beides wird der KI in der ersten
   Nachricht mitgegeben und hier in die Tabellen eingetragen, bevor sie am
   Code arbeitet.
