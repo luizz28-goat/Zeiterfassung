@@ -33,6 +33,27 @@ Zeitkonto-App: Start/Stop-Zeiterfassung mit Kategorien. Einzelne `index.html`
 - Langzeitgedächtnis läuft ausschließlich über Luiz' eigenen Server auf
   seinem PC (Connector „Luiz Memory“ in claude.ai).
 
+## Offene Probleme: immer ins Gedächtnis (Regel von Luiz, 2026-10-08)
+
+Gilt für alle KIs (Pia-Kobalt, Pia-Opal, Pia-Quarz und alle künftigen):
+
+- Besteht ein Problem oder eine unerledigte Aufgabe, wird sie **sofort** als
+  eigenes Dokument in Bank `luiz` gespeichert (Luiz Memory), nicht erst am
+  Sitzungsende. Was nur im Chat, in einer Session oder einer temporären
+  Datei steht, gilt als nicht gesichert.
+- Das Dokument ist eigenständig verständlich, damit jede andere KI direkt von
+  dort weiterarbeiten kann. Es enthält: Ziel, Stand, Diagnose, Checkliste,
+  nötige Befehle/Prompts, Grenzen, Belege und wer zuletzt daran gearbeitet hat.
+- Es bekommt eine feste `document_id` nach dem Schema `problem-<thema>` und das Tag
+  `problem:open`. Fortschritt wird im selben Dokument nachgetragen; jede KI
+  darf dafür Problem-Dokumente anderer KIs aktualisieren.
+- **Abhaken** (Tag `problem:resolved`) erst, wenn das Problem wirklich
+  abgearbeitet und geprüft ist, mit Nachweis (Live-Abfrage, Test, Commit).
+  Angestoßen, geplant oder „vermutlich behoben“ zählt nicht.
+- Vor Arbeit an einem Thema zuerst nach `problem:open` suchen und dort
+  weitermachen.
+- Kanonischer Text: Dokument `governance-regel-problem-tracking` in Bank `luiz`.
+
 ## Zusammenspiel mit claude.ai-Projects (Chat/Cowork)
 
 Dieses Repo ist im claude.ai-Project "Kleine Anwendungen" als Kontext verknüpft.
