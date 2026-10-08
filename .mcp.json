@@ -1,8 +1,0 @@
-{
-  "mcpServers": {
-    "hindsight": {
-      "command": "bash",
-      "args": [".claude/hooks/hindsight.sh", "mcp-server.js"]
-    }
-  }
-}
